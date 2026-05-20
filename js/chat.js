@@ -334,6 +334,8 @@ fileInput.onchange = async () => {
 
   if (!url) return
 
+  if (!url) return
+
   if (mode === 'dm' && currentChatUser) {
     await supabase.from('private_chats').insert([{
       sender_id: user.id,
@@ -455,25 +457,29 @@ closeStory.onclick = () => {
 }
 
 async function uploadFile(file, bucket) {
-  const ext = file.name.split('.').pop().toLowerCase()
-  const safeName = crypto.randomUUID() + '.' + ext
+  if (!file) return null
 
-  const upload = await supabase.storage
+  const ext = file.name.split('.').pop().toLowerCase()
+  const safeName = `${user.id}/${crypto.randomUUID()}.${ext}`
+
+  const { error } = await supabase.storage
     .from(bucket)
     .upload(safeName, file, {
       cacheControl: '3600',
       upsert: false
     })
 
-  if (upload.error) {
-    alert(upload.error.message)
-    console.log(upload.error)
+  if (error) {
+    console.log(error)
+    alert(error.message)
     return null
   }
 
   const { data } = supabase.storage
     .from(bucket)
     .getPublicUrl(safeName)
+
+  if (!data.publicUrl) return null
 
   return data.publicUrl
 }
