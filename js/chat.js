@@ -38,21 +38,56 @@ const deleteAccountBtn = $('deleteAccountBtn')
 
 let currentChatUser = null
 let currentGroup = null
-let mode = 'dm'
+let mode = 'home'
 let myProfile = null
 let mediaRecorder = null
 let audioChunks = []
 let typingTimer = null
 
 const { data: { user } } = await supabase.auth.getUser()
-if (!user) location.href = 'login.html'
+
+if (!user) {
+  location.href = 'login.html'
+}
 
 await loadMyProfile()
 loadGroups()
 loadStories()
+showHomeScreen()
+
+function showHomeScreen() {
+  mode = 'home'
+  currentChatUser = null
+  currentGroup = null
+  chatName.innerText = 'iChat'
+  typingText.innerText = 'Select a chat to start messaging'
+
+  messages.innerHTML = `
+    <div class="wa-home">
+      <div class="wa-laptop">
+        <i class="fa fa-laptop"></i>
+        <i class="fa fa-phone"></i>
+      </div>
+
+      <h1>Download iChat for Windows</h1>
+      <p>Get extra features like voice messages, stories, groups and more.</p>
+      <button>Download</button>
+
+      <div class="quick-actions">
+        <div><i class="fa fa-file"></i><span>Send document</span></div>
+        <div><i class="fa fa-user-plus"></i><span>Add contact</span></div>
+        <div><i class="fa fa-sparkles"></i><span>Ask iChat AI</span></div>
+      </div>
+    </div>
+  `
+}
 
 async function loadMyProfile() {
-  const { data } = await supabase.from('users').select('*').eq('uid', user.id).maybeSingle()
+  const { data } = await supabase
+    .from('users')
+    .select('*')
+    .eq('uid', user.id)
+    .maybeSingle()
 
   if (data) {
     myProfile = data
@@ -64,10 +99,13 @@ async function loadMyProfile() {
     notifyToggle.checked = data.notifications !== false
     document.body.classList.toggle('light', data.dark_mode === false)
 
-    await supabase.from('users').update({
-      online: true,
-      last_seen: new Date().toISOString()
-    }).eq('uid', user.id)
+    await supabase
+      .from('users')
+      .update({
+        online: true,
+        last_seen: new Date().toISOString()
+      })
+      .eq('uid', user.id)
 
     return
   }
@@ -89,10 +127,13 @@ async function loadMyProfile() {
 }
 
 logoutBtn.onclick = async () => {
-  await supabase.from('users').update({
-    online: false,
-    last_seen: new Date().toISOString()
-  }).eq('uid', user.id)
+  await supabase
+    .from('users')
+    .update({
+      online: false,
+      last_seen: new Date().toISOString()
+    })
+    .eq('uid', user.id)
 
   await supabase.auth.signOut()
   location.href = 'login.html'
@@ -119,20 +160,29 @@ saveProfileBtn.onclick = async () => {
   const bio = editBio.value.trim()
   let avatar = myProfile.avatar || ''
 
-  if (!username) return alert('Username required')
+  if (!username) {
+    alert('Username required')
+    return
+  }
 
   if (editAvatarFile.files[0]) {
     const uploaded = await uploadFile(editAvatarFile.files[0], 'uploads')
     if (uploaded) avatar = uploaded
   }
 
-  const { error } = await supabase.from('users').update({
-    username,
-    bio,
-    avatar
-  }).eq('uid', user.id)
+  const { error } = await supabase
+    .from('users')
+    .update({
+      username,
+      bio,
+      avatar
+    })
+    .eq('uid', user.id)
 
-  if (error) return alert(error.message)
+  if (error) {
+    alert(error.message)
+    return
+  }
 
   await loadMyProfile()
   closeProfileModal()
@@ -142,15 +192,17 @@ darkModeToggle.onchange = async () => {
   const dark = darkModeToggle.checked
   document.body.classList.toggle('light', !dark)
 
-  await supabase.from('users').update({
-    dark_mode: dark
-  }).eq('uid', user.id)
+  await supabase
+    .from('users')
+    .update({ dark_mode: dark })
+    .eq('uid', user.id)
 }
 
 notifyToggle.onchange = async () => {
-  await supabase.from('users').update({
-    notifications: notifyToggle.checked
-  }).eq('uid', user.id)
+  await supabase
+    .from('users')
+    .update({ notifications: notifyToggle.checked })
+    .eq('uid', user.id)
 }
 
 deleteAccountBtn.onclick = async () => {
@@ -169,23 +221,33 @@ searchInput.addEventListener('input', async () => {
     return
   }
 
-  const { data, error } = await supabase.from('users').select('*').ilike('username', `%${value}%`)
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .ilike('username', `%${value}%`)
 
-  if (error) return console.log(error)
+  if (error) {
+    console.log(error)
+    return
+  }
 
   searchResults.innerHTML = ''
 
-  data.forEach(u => {
+  ;(data || []).forEach(u => {
     if (u.uid === user.id) return
 
     const div = document.createElement('div')
     div.className = 'user-result'
+
     div.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px">
-        <img src="${u.avatar || 'assets/logo.png'}" style="width:48px;height:48px;border-radius:50%;object-fit:cover">
-        <div>
-          <b>@${escapeHtml(u.username)}</b><br>
-          <small>${u.online ? 'online' : lastSeenText(u.last_seen)}</small>
+      <div style="display:flex;align-items:center;gap:12px;width:100%">
+        <img src="${u.avatar || 'assets/logo.png'}" style="width:49px;height:49px;border-radius:50%;object-fit:cover">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;gap:10px">
+            <b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">@${escapeHtml(u.username)}</b>
+            <small style="color:#00a884">${u.online ? 'online' : ''}</small>
+          </div>
+          <small style="color:#8696a0">${u.online ? 'Tap to chat' : lastSeenText(u.last_seen)}</small>
         </div>
       </div>
     `
@@ -206,14 +268,19 @@ function openDM(u) {
 
 createGroupBtn.onclick = async () => {
   const name = groupNameInput.value.trim()
+
   if (!name) return
 
-  const { data, error } = await supabase.from('groups').insert([{
-    name,
-    created_by: user.id
-  }]).select().single()
+  const { data, error } = await supabase
+    .from('groups')
+    .insert([{ name, created_by: user.id }])
+    .select()
+    .single()
 
-  if (error) return alert(error.message)
+  if (error) {
+    alert(error.message)
+    return
+  }
 
   await supabase.from('group_members').insert([{
     group_id: data.id,
@@ -231,7 +298,10 @@ async function loadGroups() {
     .select('group_id, groups(*)')
     .eq('uid', user.id)
 
-  if (error) return console.log(error)
+  if (error) {
+    console.log(error)
+    return
+  }
 
   groupList.innerHTML = ''
 
@@ -241,7 +311,19 @@ async function loadGroups() {
 
     const div = document.createElement('div')
     div.className = 'group-item'
-    div.innerHTML = '👥 ' + escapeHtml(g.name)
+
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:12px;width:100%">
+        <div style="width:49px;height:49px;border-radius:50%;background:#0a332c;color:#00a884;display:grid;place-items:center;font-size:22px">
+          <i class="fa fa-users"></i>
+        </div>
+        <div style="flex:1">
+          <b>${escapeHtml(g.name)}</b><br>
+          <small style="color:#8696a0">Group chat</small>
+        </div>
+      </div>
+    `
+
     div.onclick = () => openGroup(g)
     groupList.appendChild(div)
   })
@@ -257,15 +339,33 @@ function openGroup(g) {
 }
 
 addUserToGroupBtn.onclick = async () => {
-  if (!currentGroup) return alert('Open/select a group first')
+  if (!currentGroup) {
+    alert('Open/select a group first')
+    return
+  }
 
   const username = groupInviteInput.value.trim().toLowerCase()
-  if (!username) return alert('Enter username')
 
-  const { data: target, error } = await supabase.from('users').select('*').eq('username', username).maybeSingle()
+  if (!username) {
+    alert('Enter username')
+    return
+  }
 
-  if (error) return alert(error.message)
-  if (!target) return alert('User not found')
+  const { data: target, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('username', username)
+    .maybeSingle()
+
+  if (error) {
+    alert(error.message)
+    return
+  }
+
+  if (!target) {
+    alert('User not found')
+    return
+  }
 
   const exists = await supabase
     .from('group_members')
@@ -274,7 +374,10 @@ addUserToGroupBtn.onclick = async () => {
     .eq('uid', target.uid)
     .maybeSingle()
 
-  if (exists.data) return alert('User already in group')
+  if (exists.data) {
+    alert('User already in group')
+    return
+  }
 
   const insert = await supabase.from('group_members').insert([{
     group_id: currentGroup.id,
@@ -282,7 +385,10 @@ addUserToGroupBtn.onclick = async () => {
     role: 'member'
   }])
 
-  if (insert.error) return alert(insert.error.message)
+  if (insert.error) {
+    alert(insert.error.message)
+    return
+  }
 
   groupInviteInput.value = ''
   alert('User added to group')
@@ -318,6 +424,7 @@ async function setTyping(isTyping) {
 
 async function sendMessage() {
   const text = input.value.trim()
+
   if (!text) return
 
   input.value = ''
@@ -356,16 +463,28 @@ async function loadMessages() {
     const first = await supabase
       .from('private_chats')
       .select('*')
-      .match({ sender_id: user.id, receiver_id: currentChatUser.uid })
+      .match({
+        sender_id: user.id,
+        receiver_id: currentChatUser.uid
+      })
 
     const second = await supabase
       .from('private_chats')
       .select('*')
-      .match({ sender_id: currentChatUser.uid, receiver_id: user.id })
+      .match({
+        sender_id: currentChatUser.uid,
+        receiver_id: user.id
+      })
 
-    if (first.error || second.error) return console.log(first.error || second.error)
+    if (first.error || second.error) {
+      console.log(first.error || second.error)
+      return
+    }
 
-    all = [...(first.data || []), ...(second.data || [])]
+    all = [
+      ...(first.data || []),
+      ...(second.data || [])
+    ]
 
     await supabase
       .from('private_chats')
@@ -380,13 +499,16 @@ async function loadMessages() {
       .select('*')
       .eq('group_id', currentGroup.id)
 
-    if (res.error) return console.log(res.error)
+    if (res.error) {
+      console.log(res.error)
+      return
+    }
 
     all = res.data || []
   }
 
   else {
-    messages.innerHTML = '<div class="empty-chat">Search user or open group to start chatting.</div>'
+    showHomeScreen()
     return
   }
 
@@ -400,8 +522,7 @@ async function loadMessages() {
   for (const msg of all) {
     const deleted = await isDeletedForMe(msg.id)
     if (deleted) continue
-
-    renderMessage(msg)
+    await renderMessage(msg)
   }
 
   messages.scrollTop = messages.scrollHeight
@@ -432,7 +553,10 @@ async function renderMessage(msg) {
   }
 
   else {
-    div.innerHTML = `${escapeHtml(msg.text || '')}${msg.edited ? ' <small>(edited)</small>' : ''}`
+    div.innerHTML = `
+      ${escapeHtml(msg.text || '')}
+      ${msg.edited ? ' <small>(edited)</small>' : ''}
+    `
   }
 
   const reactions = await getReactions(msg.id)
@@ -501,35 +625,44 @@ window.deleteForMe = async messageId => {
 window.deleteForEveryone = async messageId => {
   const table = mode === 'dm' ? 'private_chats' : 'group_messages'
 
-  await supabase.from(table).update({
-    deleted_for_everyone: true,
-    text: '',
-    image: '',
-    audio: ''
-  }).eq('id', messageId)
+  await supabase
+    .from(table)
+    .update({
+      deleted_for_everyone: true,
+      text: '',
+      image: '',
+      audio: ''
+    })
+    .eq('id', messageId)
 
   loadMessages()
 }
 
 window.editMessage = async messageId => {
   const newText = prompt('Edit message')
+
   if (!newText) return
 
   const table = mode === 'dm' ? 'private_chats' : 'group_messages'
 
-  await supabase.from(table).update({
-    text: newText,
-    edited: true
-  }).eq('id', messageId)
+  await supabase
+    .from(table)
+    .update({
+      text: newText,
+      edited: true
+    })
+    .eq('id', messageId)
 
   loadMessages()
 }
 
 fileInput.onchange = async () => {
   const file = fileInput.files[0]
+
   if (!file) return
 
   const url = await uploadFile(file, 'uploads')
+
   if (!url) return
 
   if (mode === 'dm' && currentChatUser) {
@@ -560,18 +693,30 @@ voiceBtn.onclick = async () => {
     return
   }
 
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: true
+  })
 
   mediaRecorder = new MediaRecorder(stream)
   audioChunks = []
 
-  mediaRecorder.ondataavailable = e => audioChunks.push(e.data)
+  mediaRecorder.ondataavailable = e => {
+    audioChunks.push(e.data)
+  }
 
   mediaRecorder.onstop = async () => {
-    const blob = new Blob(audioChunks, { type: 'audio/webm' })
-    const file = new File([blob], 'voice.webm', { type: 'audio/webm' })
+    const blob = new Blob(audioChunks, {
+      type: 'audio/webm'
+    })
+
+    const file = new File(
+      [blob],
+      'voice.webm',
+      { type: 'audio/webm' }
+    )
 
     const url = await uploadFile(file, 'uploads')
+
     if (!url) return
 
     if (mode === 'dm' && currentChatUser) {
@@ -601,9 +746,11 @@ voiceBtn.onclick = async () => {
 
 storyInput.onchange = async () => {
   const file = storyInput.files[0]
+
   if (!file) return
 
   const url = await uploadFile(file, 'uploads')
+
   if (!url) return
 
   await supabase.from('stories').insert([{
@@ -618,6 +765,7 @@ storyInput.onchange = async () => {
 
 textStoryBtn.onclick = async () => {
   const text = prompt('Enter text status')
+
   if (!text) return
 
   await supabase.from('stories').insert([{
@@ -684,10 +832,12 @@ async function uploadFile(file, bucket) {
   const ext = file.name.split('.').pop().toLowerCase()
   const safeName = `${user.id}/${crypto.randomUUID()}.${ext}`
 
-  const { error } = await supabase.storage.from(bucket).upload(safeName, file, {
-    cacheControl: '3600',
-    upsert: false
-  })
+  const { error } = await supabase.storage
+    .from(bucket)
+    .upload(safeName, file, {
+      cacheControl: '3600',
+      upsert: false
+    })
 
   if (error) {
     console.log(error)
@@ -695,25 +845,63 @@ async function uploadFile(file, bucket) {
     return null
   }
 
-  const { data } = supabase.storage.from(bucket).getPublicUrl(safeName)
+  const { data } = supabase.storage
+    .from(bucket)
+    .getPublicUrl(safeName)
 
   return data.publicUrl || null
 }
 
 supabase
   .channel('ichat-v4')
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'private_chats' }, () => {
+  .on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: 'private_chats'
+  }, () => {
     if (mode === 'dm') loadMessages()
   })
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'group_messages' }, () => {
+  .on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: 'group_messages'
+  }, () => {
     if (mode === 'group') loadMessages()
   })
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, loadMessages)
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'deleted_messages' }, loadMessages)
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, loadGroups)
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, loadGroups)
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'stories' }, loadStories)
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'typing_status' }, payload => {
+  .on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: 'message_reactions'
+  }, () => {
+    if (mode !== 'home') loadMessages()
+  })
+  .on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: 'deleted_messages'
+  }, () => {
+    if (mode !== 'home') loadMessages()
+  })
+  .on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: 'groups'
+  }, loadGroups)
+  .on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: 'group_members'
+  }, loadGroups)
+  .on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: 'stories'
+  }, loadStories)
+  .on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: 'typing_status'
+  }, payload => {
     const t = payload.new
 
     if (
@@ -722,16 +910,25 @@ supabase
       t.sender_id === currentChatUser.uid &&
       t.receiver_id === user.id
     ) {
-      typingText.innerText = t.typing ? 'typing...' : currentChatUser.online ? 'online' : lastSeenText(currentChatUser.last_seen)
+      typingText.innerText = t.typing
+        ? 'typing...'
+        : currentChatUser.online
+          ? 'online'
+          : lastSeenText(currentChatUser.last_seen)
     }
   })
-  .subscribe(status => console.log('Realtime:', status))
+  .subscribe(status => {
+    console.log('Realtime:', status)
+  })
 
 window.addEventListener('beforeunload', async () => {
-  await supabase.from('users').update({
-    online: false,
-    last_seen: new Date().toISOString()
-  }).eq('uid', user.id)
+  await supabase
+    .from('users')
+    .update({
+      online: false,
+      last_seen: new Date().toISOString()
+    })
+    .eq('uid', user.id)
 })
 
 function escapeHtml(text = '') {
