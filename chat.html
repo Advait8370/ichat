@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>iChat V3</title>
+  <title>iChat V4</title>
   <link rel="stylesheet" href="css/chat.css">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
 </head>
@@ -11,13 +11,13 @@
 
 <div class="app">
   <aside class="sidebar">
-
-    <div class="profile">
+    <div class="profile" onclick="openProfileModal()">
       <img id="profilePic" src="assets/logo.png">
       <div>
         <h2>iChat</h2>
         <small id="myUsername">Loading...</small>
       </div>
+      <button onclick="event.stopPropagation();openSettingsModal()">⚙</button>
     </div>
 
     <div class="tabs">
@@ -34,6 +34,8 @@
     <div class="group-tools">
       <input id="groupNameInput" placeholder="New group name">
       <button id="createGroupBtn">Create Group</button>
+      <input id="groupInviteInput" placeholder="Username to add">
+      <button id="addUserToGroupBtn">Add To Selected Group</button>
     </div>
 
     <div id="groupList"></div>
@@ -42,25 +44,17 @@
   </aside>
 
   <main class="chat-area">
-
     <header class="chat-header">
       <div>
         <h3 id="chatName">Select User or Group</h3>
         <small id="typingText"></small>
       </div>
-
-      <div class="header-actions">
-        <button id="voiceBtn">
-          <i class="fa fa-microphone"></i>
-        </button>
-      </div>
+      <button id="voiceBtn"><i class="fa fa-microphone"></i></button>
     </header>
 
     <section class="stories">
-      <label class="story-add">
-        +
-        <input id="storyInput" type="file" hidden>
-      </label>
+      <label class="story-add">+<input id="storyInput" type="file" hidden></label>
+      <button id="textStoryBtn">Text Status</button>
       <div id="storiesList"></div>
     </section>
 
@@ -70,23 +64,37 @@
 
     <footer class="message-input">
       <input id="messageInput" placeholder="Message">
-
-      <label>
-        <i class="fa fa-image"></i>
-        <input id="fileInput" type="file" hidden>
-      </label>
-
-      <button id="sendBtn">
-        <i class="fa fa-paper-plane"></i>
-      </button>
+      <label><i class="fa fa-image"></i><input id="fileInput" type="file" hidden></label>
+      <button id="sendBtn"><i class="fa fa-paper-plane"></i></button>
     </footer>
-
   </main>
 </div>
 
 <div id="storyViewer" class="story-viewer">
-  <button id="closeStory">×</button>
+  <button onclick="closeStoryViewer()">×</button>
+  <div id="storyTextBox"></div>
   <img id="storyImage">
+</div>
+
+<div id="profileModal" class="modal">
+  <div class="modal-box">
+    <button class="close" onclick="closeProfileModal()">×</button>
+    <h2>Edit Profile</h2>
+    <input id="editUsername" placeholder="Username">
+    <input id="editBio" placeholder="Bio">
+    <input id="editAvatarFile" type="file">
+    <button id="saveProfileBtn">Save Profile</button>
+  </div>
+</div>
+
+<div id="settingsModal" class="modal">
+  <div class="modal-box">
+    <button class="close" onclick="closeSettingsModal()">×</button>
+    <h2>Settings</h2>
+    <label><input id="darkModeToggle" type="checkbox" checked> Dark Mode</label>
+    <label><input id="notifyToggle" type="checkbox" checked> Notifications</label>
+    <button id="deleteAccountBtn" class="danger">Delete Account</button>
+  </div>
 </div>
 
 <script type="module" src="js/chat.js"></script>

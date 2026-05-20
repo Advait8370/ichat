@@ -5,10 +5,7 @@ window.register = async () => {
   const email = document.getElementById('email').value.trim()
   const password = document.getElementById('password').value.trim()
 
-  if (!username || !email || !password) {
-    alert('Fill all fields')
-    return
-  }
+  if (!username || !email || !password) return alert('Fill all fields')
 
   const existing = await supabase
     .from('users')
@@ -16,20 +13,10 @@ window.register = async () => {
     .eq('username', username)
     .maybeSingle()
 
-  if (existing.data) {
-    alert('Username already exists')
-    return
-  }
+  if (existing.data) return alert('Username already exists')
 
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password
-  })
-
-  if (error) {
-    alert(error.message)
-    return
-  }
+  const { data, error } = await supabase.auth.signUp({ email, password })
+  if (error) return alert(error.message)
 
   const insert = await supabase.from('users').insert([{
     uid: data.user.id,
@@ -37,13 +24,12 @@ window.register = async () => {
     email,
     avatar: '',
     bio: '',
-    online: true
+    online: true,
+    notifications: true,
+    dark_mode: true
   }])
 
-  if (insert.error) {
-    alert(insert.error.message)
-    return
-  }
+  if (insert.error) return alert(insert.error.message)
 
   location.href = 'chat.html'
 }
@@ -52,20 +38,10 @@ window.loginEmail = async () => {
   const email = document.getElementById('email').value.trim()
   const password = document.getElementById('password').value.trim()
 
-  if (!email || !password) {
-    alert('Fill all fields')
-    return
-  }
+  if (!email || !password) return alert('Fill all fields')
 
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password
-  })
-
-  if (error) {
-    alert(error.message)
-    return
-  }
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) return alert(error.message)
 
   location.href = 'chat.html'
 }
