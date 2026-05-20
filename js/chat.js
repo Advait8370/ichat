@@ -28,13 +28,9 @@ let mode = 'dm'
 let mediaRecorder = null
 let audioChunks = []
 
-const {
-  data: { user }
-} = await supabase.auth.getUser()
+const { data: { user } } = await supabase.auth.getUser()
 
-if (!user) {
-  location.href = 'login.html'
-}
+if (!user) location.href = 'login.html'
 
 await loadMyProfile()
 loadGroups()
@@ -49,10 +45,7 @@ async function loadMyProfile() {
 
   if (data) {
     myUsername.innerText = '@' + data.username
-
-    if (data.avatar) {
-      profilePic.src = data.avatar
-    }
+    profilePic.src = data.avatar || 'assets/logo.png'
 
     await supabase
       .from('users')
@@ -102,10 +95,7 @@ searchInput.addEventListener('input', async () => {
     .select('*')
     .ilike('username', `%${value}%`)
 
-  if (error) {
-    console.log(error)
-    return
-  }
+  if (error) return console.log(error)
 
   searchResults.innerHTML = ''
 
@@ -117,7 +107,7 @@ searchInput.addEventListener('input', async () => {
 
     div.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px">
-        <img src="${u.avatar || 'assets/default.png'}"
+        <img src="${u.avatar || 'assets/logo.png'}"
         style="width:48px;height:48px;border-radius:50%;object-fit:cover">
         <div>
           <b>@${escapeHtml(u.username)}</b><br>
@@ -141,7 +131,6 @@ function openDM(u) {
 
 createGroupBtn.onclick = async () => {
   const name = groupNameInput.value.trim()
-
   if (!name) return
 
   const { data, error } = await supabase
@@ -150,10 +139,7 @@ createGroupBtn.onclick = async () => {
     .select()
     .single()
 
-  if (error) {
-    alert(error.message)
-    return
-  }
+  if (error) return alert(error.message)
 
   await supabase.from('group_members').insert([{
     group_id: data.id,
@@ -171,16 +157,12 @@ async function loadGroups() {
     .select('group_id, groups(*)')
     .eq('uid', user.id)
 
-  if (error) {
-    console.log(error)
-    return
-  }
+  if (error) return console.log(error)
 
   groupList.innerHTML = ''
 
   ;(data || []).forEach(row => {
     const g = row.groups
-
     if (!g) return
 
     const div = document.createElement('div')
@@ -203,14 +185,11 @@ function openGroup(g) {
 sendBtn.onclick = sendMessage
 
 input.addEventListener('keypress', e => {
-  if (e.key === 'Enter') {
-    sendMessage()
-  }
+  if (e.key === 'Enter') sendMessage()
 })
 
 async function sendMessage() {
   const text = input.value.trim()
-
   if (!text) return
 
   input.value = ''
@@ -242,7 +221,6 @@ async function sendMessage() {
 
 async function loadMessages() {
   messages.innerHTML = ''
-
   let all = []
 
   if (mode === 'dm' && currentChatUser) {
@@ -267,10 +245,7 @@ async function loadMessages() {
       return
     }
 
-    all = [
-      ...(first.data || []),
-      ...(second.data || [])
-    ]
+    all = [...(first.data || []), ...(second.data || [])]
   }
 
   else if (mode === 'group' && currentGroup) {
@@ -279,10 +254,7 @@ async function loadMessages() {
       .select('*')
       .eq('group_id', currentGroup.id)
 
-    if (res.error) {
-      console.log(res.error)
-      return
-    }
+    if (res.error) return console.log(res.error)
 
     all = res.data || []
   }
@@ -308,10 +280,12 @@ async function loadMessages() {
     )
 
     if (msg.type === 'image') {
+      if (!msg.image || msg.image === 'null') return
       div.innerHTML = `<img src="${msg.image}">`
     }
 
     else if (msg.type === 'voice') {
+      if (!msg.audio || msg.audio === 'null') return
       div.innerHTML = `<audio controls src="${msg.audio}"></audio>`
     }
 
@@ -327,13 +301,9 @@ async function loadMessages() {
 
 fileInput.onchange = async () => {
   const file = fileInput.files[0]
-
   if (!file) return
 
   const url = await uploadFile(file, 'uploads')
-
-  if (!url) return
-
   if (!url) return
 
   if (mode === 'dm' && currentChatUser) {
@@ -364,21 +334,15 @@ voiceBtn.onclick = async () => {
     return
   }
 
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: true
-  })
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
 
   mediaRecorder = new MediaRecorder(stream)
   audioChunks = []
 
-  mediaRecorder.ondataavailable = e => {
-    audioChunks.push(e.data)
-  }
+  mediaRecorder.ondataavailable = e => audioChunks.push(e.data)
 
   mediaRecorder.onstop = async () => {
-    const blob = new Blob(audioChunks, {
-      type: 'audio/webm'
-    })
+    const blob = new Blob(audioChunks, { type: 'audio/webm' })
 
     const file = new File(
       [blob],
@@ -387,6 +351,7 @@ voiceBtn.onclick = async () => {
     )
 
     const url = await uploadFile(file, 'uploads')
+    if (!url) return
 
     if (mode === 'dm' && currentChatUser) {
       await supabase.from('private_chats').insert([{
@@ -415,10 +380,10 @@ voiceBtn.onclick = async () => {
 
 storyInput.onchange = async () => {
   const file = storyInput.files[0]
-
   if (!file) return
 
   const url = await uploadFile(file, 'uploads')
+  if (!url) return
 
   await supabase.from('stories').insert([{
     uid: user.id,
@@ -439,11 +404,14 @@ async function loadStories() {
   storiesList.innerHTML = ''
 
   ;(data || []).forEach(s => {
+    if (!s.image || s.image === 'null') return
+
     const div = document.createElement('div')
     div.className = 'story-bubble'
     div.innerHTML = `<img src="${s.image}">`
 
     div.onclick = () => {
+      if (!s.image || s.image === 'null') return
       storyImage.src = s.image
       storyViewer.style.display = 'grid'
     }
@@ -479,9 +447,7 @@ async function uploadFile(file, bucket) {
     .from(bucket)
     .getPublicUrl(safeName)
 
-  if (!data.publicUrl) return null
-
-  return data.publicUrl
+  return data.publicUrl || null
 }
 
 supabase
