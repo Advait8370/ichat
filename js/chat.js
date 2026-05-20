@@ -117,7 +117,7 @@ searchInput.addEventListener('input', async () => {
 
     div.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px">
-        <img src="${u.avatar || 'default.png'}"
+        <img src="${u.avatar || 'assets/default.png'}"
         style="width:48px;height:48px;border-radius:50%;object-fit:cover">
         <div>
           <b>@${escapeHtml(u.username)}</b><br>
