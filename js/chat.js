@@ -58,6 +58,7 @@ let currentChatUser = null
 let currentGroup = null
 let mode = 'dm'
 let myProfile = null
+let recentChatsLoadId = 0
 let mediaRecorder = null
 let audioChunks = []
 let typingTimer = null
@@ -226,6 +227,8 @@ deleteAccountBtn.onclick = async () => {
 }
 
 async function loadRecentChats() {
+  const loadId = ++recentChatsLoadId
+
   const sent = await supabase
     .from('private_chats')
     .select('*')
@@ -235,6 +238,8 @@ async function loadRecentChats() {
     .from('private_chats')
     .select('*')
     .eq('receiver_id', user.id)
+
+  if (loadId !== recentChatsLoadId) return
 
   const all = [
     ...(sent.data || []),
@@ -257,7 +262,7 @@ async function loadRecentChats() {
   const sortedChats = [...chatMap.entries()]
     .sort((a, b) => new Date(b[1].created_at) - new Date(a[1].created_at))
 
-  recentChats.innerHTML = ''
+  const fragment = document.createDocumentFragment()
 
   for (const [otherId, msg] of sortedChats) {
     const { data: other } = await supabase
@@ -266,6 +271,7 @@ async function loadRecentChats() {
       .eq('uid', otherId)
       .maybeSingle()
 
+    if (loadId !== recentChatsLoadId) return
     if (!other) continue
 
     const { data: unread } = await supabase
@@ -274,6 +280,8 @@ async function loadRecentChats() {
       .eq('sender_id', otherId)
       .eq('receiver_id', user.id)
       .eq('seen', false)
+
+    if (loadId !== recentChatsLoadId) return
 
     const div = document.createElement('div')
     div.className = 'chat-item'
@@ -288,8 +296,12 @@ async function loadRecentChats() {
     `
 
     div.onclick = () => openDM(other)
-    recentChats.appendChild(div)
+    fragment.appendChild(div)
   }
+
+  if (loadId !== recentChatsLoadId) return
+
+  recentChats.replaceChildren(fragment)
 }
 
 function previewMessage(msg) {
@@ -304,11 +316,13 @@ searchInput.addEventListener('input', async () => {
 
   if (!value) {
     searchResults.innerHTML = ''
+    searchResults.style.display = 'none'
     recentChats.style.display = 'block'
     return
   }
 
   recentChats.style.display = 'none'
+  searchResults.style.display = 'block'
 
   const { data, error } = await supabase
     .from('users')
