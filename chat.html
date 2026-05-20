@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>iChat</title>
+  <title>iChat V6</title>
   <link rel="icon" href="./favicon.ico">
   <link rel="shortcut icon" href="./favicon.ico">
   <link rel="stylesheet" href="css/chat.css">
@@ -13,14 +13,13 @@
 
 <div class="app">
   <aside class="sidebar">
-
     <div class="profile" onclick="openProfileModal()">
-      <img id="profilePic" src="./assets/logo.png">
+      <img id="profilePic" src="./assets/logo.png" alt="Profile">
       <div>
-        <h2>iChat</h2>
+        <h2>iChat V6</h2>
         <small id="myUsername">Loading...</small>
       </div>
-      <button onclick="event.stopPropagation();openSettingsModal()">⚙</button>
+      <button title="Settings" onclick="event.stopPropagation();openSettingsModal()"><i class="fa fa-gear"></i></button>
     </div>
 
     <div class="tabs">
@@ -37,40 +36,57 @@
 
     <div class="group-tools" hidden>
       <input id="groupNameInput" placeholder="New group name">
-      <button id="createGroupBtn">Create Group</button>
+      <button id="createGroupBtn"><i class="fa fa-plus"></i> Create Group</button>
       <input id="groupInviteInput" placeholder="Username to add">
-      <button id="addUserToGroupBtn">Add To Selected Group</button>
+      <button id="addUserToGroupBtn"><i class="fa fa-user-plus"></i> Add To Group</button>
     </div>
 
     <div id="groupList" hidden></div>
 
-    <button id="logoutBtn" class="logout">Logout</button>
+    <button id="logoutBtn" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</button>
   </aside>
 
   <main class="chat-area">
-
     <header class="chat-header">
-      <div>
+      <button id="mobileBackBtn" class="mobile-back"><i class="fa fa-arrow-left"></i></button>
+      <img id="chatAvatar" class="chat-avatar" src="./assets/logo.png" alt="Chat">
+      <div class="chat-title">
         <h3 id="chatName">Select User or Group</h3>
         <small id="typingText"></small>
       </div>
 
       <div class="call-buttons">
+        <button id="messageSearchToggle" title="Search messages"><i class="fa fa-magnifying-glass"></i></button>
+        <button id="pinChatBtn" title="Pin chat"><i class="fa fa-thumbtack"></i></button>
+        <button id="muteChatBtn" title="Mute chat"><i class="fa fa-bell"></i></button>
+        <button id="blockUserBtn" title="Block user"><i class="fa fa-ban"></i></button>
+        <button id="groupInfoBtn" title="Group info"><i class="fa fa-circle-info"></i></button>
         <button id="audioCallBtn" title="Voice Call"><i class="fa fa-phone"></i></button>
         <button id="videoCallBtn" title="Video Call"><i class="fa fa-video"></i></button>
         <button id="voiceBtn" title="Voice Message"><i class="fa fa-microphone"></i></button>
       </div>
     </header>
 
+    <div id="messageSearchBox" class="message-search" hidden>
+      <input id="messageSearchInput" placeholder="Search in this chat">
+      <button id="clearMessageSearchBtn"><i class="fa fa-xmark"></i></button>
+    </div>
+
     <section class="stories">
-      <label class="story-add">+<input id="storyInput" type="file" hidden></label>
+      <label class="story-add" title="Add story">+<input id="storyInput" type="file" accept="image/*,video/*" hidden></label>
       <button id="textStoryBtn">Text Status</button>
       <div id="storiesList"></div>
     </section>
 
     <div id="replyPreview" class="reply-preview">
       <span id="replyText"></span>
-      <button id="cancelReplyBtn">×</button>
+      <button id="cancelReplyBtn"><i class="fa fa-xmark"></i></button>
+    </div>
+
+    <div id="filePreview" class="file-preview" hidden>
+      <div id="filePreviewContent"></div>
+      <button id="sendFileBtn"><i class="fa fa-paper-plane"></i></button>
+      <button id="cancelFileBtn"><i class="fa fa-xmark"></i></button>
     </div>
 
     <section id="messages" class="messages">
@@ -79,37 +95,59 @@
 
     <footer class="message-input">
       <input id="messageInput" placeholder="Message">
-      <label><i class="fa fa-image"></i><input id="fileInput" type="file" hidden></label>
+      <label title="Attach file"><i class="fa fa-paperclip"></i><input id="fileInput" type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" hidden></label>
       <button id="sendBtn"><i class="fa fa-paper-plane"></i></button>
     </footer>
-
   </main>
 </div>
 
 <div id="storyViewer" class="story-viewer">
-  <button onclick="closeStoryViewer()">×</button>
+  <button onclick="closeStoryViewer()"><i class="fa fa-xmark"></i></button>
   <div id="storyTextBox"></div>
-  <img id="storyImage">
+  <img id="storyImage" alt="Story">
+  <video id="storyVideo" controls></video>
 </div>
 
 <div id="profileModal" class="modal">
   <div class="modal-box">
-    <button class="close" onclick="closeProfileModal()">×</button>
+    <button class="close" onclick="closeProfileModal()"><i class="fa fa-xmark"></i></button>
     <h2>Edit Profile</h2>
     <input id="editUsername" placeholder="Username">
     <input id="editBio" placeholder="Bio">
-    <input id="editAvatarFile" type="file">
+    <input id="editAvatarFile" type="file" accept="image/*">
     <button id="saveProfileBtn">Save Profile</button>
   </div>
 </div>
 
 <div id="settingsModal" class="modal">
   <div class="modal-box">
-    <button class="close" onclick="closeSettingsModal()">×</button>
+    <button class="close" onclick="closeSettingsModal()"><i class="fa fa-xmark"></i></button>
     <h2>Settings</h2>
     <label><input id="darkModeToggle" type="checkbox" checked> Dark Mode</label>
     <label><input id="notifyToggle" type="checkbox" checked> Notifications</label>
+    <label><input id="hideOnlineToggle" type="checkbox"> Hide Online Status</label>
+    <label><input id="hideLastSeenToggle" type="checkbox"> Hide Last Seen</label>
     <button id="deleteAccountBtn" class="danger">Delete Account</button>
+  </div>
+</div>
+
+<div id="groupInfoModal" class="modal">
+  <div class="modal-box group-info-box">
+    <button class="close" onclick="closeGroupInfoModal()"><i class="fa fa-xmark"></i></button>
+    <img id="groupInfoImage" src="./assets/logo.png" alt="Group">
+    <h2 id="groupInfoName">Group Info</h2>
+    <label id="groupImageLabel" class="upload-line"><i class="fa fa-camera"></i> Change Group Photo<input id="groupImageInput" type="file" accept="image/*" hidden></label>
+    <h3>Members</h3>
+    <div id="groupMembersList"></div>
+    <button id="leaveGroupBtn" class="danger">Leave Group</button>
+  </div>
+</div>
+
+<div id="forwardModal" class="modal">
+  <div class="modal-box">
+    <button class="close" onclick="closeForwardModal()"><i class="fa fa-xmark"></i></button>
+    <h2>Forward Message</h2>
+    <div id="forwardTargets"></div>
   </div>
 </div>
 
@@ -130,7 +168,6 @@
       <video id="remoteVideo" autoplay playsinline></video>
       <video id="localVideo" autoplay muted playsinline></video>
     </div>
-
     <div class="call-controls">
       <button id="muteBtn"><i class="fa fa-microphone"></i></button>
       <button id="cameraBtn"><i class="fa fa-video"></i></button>

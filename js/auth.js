@@ -13,10 +13,12 @@ window.register = async () => {
     .eq('username', username)
     .maybeSingle()
 
+  if (existing.error) return alert(existing.error.message)
   if (existing.data) return alert('Username already exists')
 
   const { data, error } = await supabase.auth.signUp({ email, password })
   if (error) return alert(error.message)
+  if (!data.user) return alert('Could not create account. Please try again.')
 
   const insert = await supabase.from('users').insert([{
     uid: data.user.id,
