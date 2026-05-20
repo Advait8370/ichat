@@ -1,11 +1,10 @@
-<<<<<<< HEAD
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>iChat V3</title>
-  <link rel="stylesheet" href="css/chat.css">
+  <link rel="stylesheet" href="chat.css">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
 </head>
 <body>
@@ -15,7 +14,7 @@
   <aside class="sidebar">
 
     <div class="profile">
-      <img id="profilePic" src="assets/default.png">
+      <img id="profilePic" src="default.png">
       <div>
         <h2>iChat</h2>
         <small id="myUsername">Loading...</small>
@@ -23,8 +22,8 @@
     </div>
 
     <div class="tabs">
-      <button id="dmTab" class="active">Chats</button>
-      <button id="groupTab">Groups</button>
+      <button class="active">Chats</button>
+      <button>Groups</button>
     </div>
 
     <div class="search-box">
@@ -96,97 +95,7 @@
   <img id="storyImage">
 </div>
 
-<script type="module" src="js/chat.js"></script>
+<script type="module" src="chat.js"></script>
 
 </body>
-=======
-<!DOCTYPE html>
-<html>
-
-<head>
-
-  <title>iChat</title>
-
-  <meta name="viewport"
-   content="width=device-width, initial-scale=1.0">
-
-  <link rel="stylesheet"
-   href="css/chat.css">
-
-  <link href=
-"https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
- rel="stylesheet">
-
-</head>
-
-<body>
-
-<div class="app">
-
-  <!-- SIDEBAR -->
-
-  <div class="sidebar">
-
-    <div class="profile">
-
-      <img src="assets/default.png">
-
-      <h2>iChat</h2>
-
-    </div>
-
-    <div class="stories"
-     id="stories"></div>
-
-    <div class="chat-list"
-     id="chatList"></div>
-
-  </div>
-
-  <!-- CHAT -->
-
-  <div class="chat-area">
-
-    <div class="chat-header">
-
-      <h3>Global Chat</h3>
-
-    </div>
-
-    <div class="messages"
-     id="messages"></div>
-
-    <div class="message-input">
-
-      <input type="text"
-       id="messageInput"
-       placeholder="Message">
-
-      <label>
-
-        <i class="fa fa-image"></i>
-
-        <input type="file"
-         id="fileInput"
-         hidden>
-
-      </label>
-
-      <button id="sendBtn">
-
-        <i class="fa fa-paper-plane"></i>
-
-      </button>
-
-    </div>
-
-  </div>
-
-</div>
-
-<script type="module"
- src="js/chat.js"></script>
-
-</body>
->>>>>>> e5a925c5d6c1af47d36f118296cf2b3842f8ecc9
 </html>

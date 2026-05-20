@@ -1,31 +1,9 @@
-<<<<<<< HEAD
-{
-  "name": "iChat V3",
-  "short_name": "iChat",
-  "start_url": "index.html",
-  "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#06b6d4",
-  "icons": []
-=======
 {
   "name": "iChat",
   "short_name": "iChat",
-  "start_url": "/",
+  "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#06b6d4",
-  "icons": [
-    {
-      "src": "assets/icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "assets/icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
-  ]
->>>>>>> e5a925c5d6c1af47d36f118296cf2b3842f8ecc9
+  "background_color": "#111b21",
+  "theme_color": "#00a884",
+  "icons": []
 }

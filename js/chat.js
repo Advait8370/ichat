@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { supabase } from './supabase.js'
 
 const $ = id => document.getElementById(id)
@@ -65,29 +64,17 @@ async function loadMyProfile() {
 
   const username = 'user_' + Math.floor(Math.random() * 999999)
 
-  await supabase
-    .from('users')
-    .insert([{
-      uid: user.id,
-      username,
-      email: user.email,
-      avatar: '',
-      bio: '',
-      online: true
-    }])
+  await supabase.from('users').insert([{
+    uid: user.id,
+    username,
+    email: user.email,
+    avatar: '',
+    bio: '',
+    online: true
+  }])
 
   loadMyProfile()
 }
-
-window.addEventListener('beforeunload', async () => {
-  await supabase
-    .from('users')
-    .update({
-      online: false,
-      last_seen: new Date().toISOString()
-    })
-    .eq('uid', user.id)
-})
 
 logoutBtn.onclick = async () => {
   await supabase
@@ -99,7 +86,6 @@ logoutBtn.onclick = async () => {
     .eq('uid', user.id)
 
   await supabase.auth.signOut()
-
   location.href = 'login.html'
 }
 
@@ -131,7 +117,7 @@ searchInput.addEventListener('input', async () => {
 
     div.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px">
-        <img src="${u.avatar || 'assets/default.png'}"
+        <img src="${u.avatar || 'default.png'}"
         style="width:48px;height:48px;border-radius:50%;object-fit:cover">
         <div>
           <b>@${escapeHtml(u.username)}</b><br>
@@ -141,7 +127,6 @@ searchInput.addEventListener('input', async () => {
     `
 
     div.onclick = () => openDM(u)
-
     searchResults.appendChild(div)
   })
 })
@@ -150,9 +135,7 @@ function openDM(u) {
   mode = 'dm'
   currentChatUser = u
   currentGroup = null
-
   chatName.innerText = '@' + u.username
-
   loadMessages()
 }
 
@@ -163,10 +146,7 @@ createGroupBtn.onclick = async () => {
 
   const { data, error } = await supabase
     .from('groups')
-    .insert([{
-      name,
-      created_by: user.id
-    }])
+    .insert([{ name, created_by: user.id }])
     .select()
     .single()
 
@@ -175,34 +155,37 @@ createGroupBtn.onclick = async () => {
     return
   }
 
-  await supabase
-    .from('group_members')
-    .insert([{
-      group_id: data.id,
-      uid: user.id,
-      role: 'admin'
-    }])
+  await supabase.from('group_members').insert([{
+    group_id: data.id,
+    uid: user.id,
+    role: 'admin'
+  }])
 
   groupNameInput.value = ''
-
   loadGroups()
 }
 
 async function loadGroups() {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('group_members')
     .select('group_id, groups(*)')
     .eq('uid', user.id)
+
+  if (error) {
+    console.log(error)
+    return
+  }
 
   groupList.innerHTML = ''
 
   ;(data || []).forEach(row => {
     const g = row.groups
 
+    if (!g) return
+
     const div = document.createElement('div')
     div.className = 'group-item'
     div.innerHTML = '👥 ' + escapeHtml(g.name)
-
     div.onclick = () => openGroup(g)
 
     groupList.appendChild(div)
@@ -213,9 +196,7 @@ function openGroup(g) {
   mode = 'group'
   currentGroup = g
   currentChatUser = null
-
   chatName.innerText = '👥 ' + g.name
-
   loadMessages()
 }
 
@@ -235,27 +216,23 @@ async function sendMessage() {
   input.value = ''
 
   if (mode === 'dm' && currentChatUser) {
-    const { error } = await supabase
-      .from('private_chats')
-      .insert([{
-        sender_id: user.id,
-        receiver_id: currentChatUser.uid,
-        text,
-        type: 'text'
-      }])
+    const { error } = await supabase.from('private_chats').insert([{
+      sender_id: user.id,
+      receiver_id: currentChatUser.uid,
+      text,
+      type: 'text'
+    }])
 
     if (error) alert(error.message)
   }
 
   if (mode === 'group' && currentGroup) {
-    const { error } = await supabase
-      .from('group_messages')
-      .insert([{
-        group_id: currentGroup.id,
-        sender_id: user.id,
-        text,
-        type: 'text'
-      }])
+    const { error } = await supabase.from('group_messages').insert([{
+      group_id: currentGroup.id,
+      sender_id: user.id,
+      text,
+      type: 'text'
+    }])
 
     if (error) alert(error.message)
   }
@@ -285,13 +262,8 @@ async function loadMessages() {
         receiver_id: user.id
       })
 
-    if (first.error) {
-      console.log(first.error)
-      return
-    }
-
-    if (second.error) {
-      console.log(second.error)
+    if (first.error || second.error) {
+      console.log(first.error || second.error)
       return
     }
 
@@ -316,24 +288,14 @@ async function loadMessages() {
   }
 
   else {
-    messages.innerHTML = `
-      <div class="empty-chat">
-        Search user or open group to start chatting.
-      </div>
-    `
+    messages.innerHTML = '<div class="empty-chat">Search user or open group to start chatting.</div>'
     return
   }
 
-  all.sort((a, b) =>
-    new Date(a.created_at) - new Date(b.created_at)
-  )
+  all.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
 
   if (all.length === 0) {
-    messages.innerHTML = `
-      <div class="empty-chat">
-        No messages yet.
-      </div>
-    `
+    messages.innerHTML = '<div class="empty-chat">No messages yet.</div>'
     return
   }
 
@@ -373,25 +335,21 @@ fileInput.onchange = async () => {
   if (!url) return
 
   if (mode === 'dm' && currentChatUser) {
-    await supabase
-      .from('private_chats')
-      .insert([{
-        sender_id: user.id,
-        receiver_id: currentChatUser.uid,
-        type: 'image',
-        image: url
-      }])
+    await supabase.from('private_chats').insert([{
+      sender_id: user.id,
+      receiver_id: currentChatUser.uid,
+      type: 'image',
+      image: url
+    }])
   }
 
   if (mode === 'group' && currentGroup) {
-    await supabase
-      .from('group_messages')
-      .insert([{
-        group_id: currentGroup.id,
-        sender_id: user.id,
-        type: 'image',
-        image: url
-      }])
+    await supabase.from('group_messages').insert([{
+      group_id: currentGroup.id,
+      sender_id: user.id,
+      type: 'image',
+      image: url
+    }])
   }
 
   loadMessages()
@@ -422,39 +380,34 @@ voiceBtn.onclick = async () => {
 
     const file = new File(
       [blob],
-      'voice_' + Date.now() + '.webm',
+      'voice.webm',
       { type: 'audio/webm' }
     )
 
     const url = await uploadFile(file, 'uploads')
 
     if (mode === 'dm' && currentChatUser) {
-      await supabase
-        .from('private_chats')
-        .insert([{
-          sender_id: user.id,
-          receiver_id: currentChatUser.uid,
-          type: 'voice',
-          audio: url
-        }])
+      await supabase.from('private_chats').insert([{
+        sender_id: user.id,
+        receiver_id: currentChatUser.uid,
+        type: 'voice',
+        audio: url
+      }])
     }
 
     if (mode === 'group' && currentGroup) {
-      await supabase
-        .from('group_messages')
-        .insert([{
-          group_id: currentGroup.id,
-          sender_id: user.id,
-          type: 'voice',
-          audio: url
-        }])
+      await supabase.from('group_messages').insert([{
+        group_id: currentGroup.id,
+        sender_id: user.id,
+        type: 'voice',
+        audio: url
+      }])
     }
 
     loadMessages()
   }
 
   mediaRecorder.start()
-
   voiceBtn.innerHTML = '<i class="fa fa-stop"></i>'
 }
 
@@ -465,13 +418,11 @@ storyInput.onchange = async () => {
 
   const url = await uploadFile(file, 'uploads')
 
-  await supabase
-    .from('stories')
-    .insert([{
-      uid: user.id,
-      image: url,
-      expires_at: new Date(Date.now() + 86400000).toISOString()
-    }])
+  await supabase.from('stories').insert([{
+    uid: user.id,
+    image: url,
+    expires_at: new Date(Date.now() + 86400000).toISOString()
+  }])
 
   loadStories()
 }
@@ -481,17 +432,13 @@ async function loadStories() {
     .from('stories')
     .select('*')
     .gt('expires_at', new Date().toISOString())
-    .order('created_at', {
-      ascending: false
-    })
+    .order('created_at', { ascending: false })
 
   storiesList.innerHTML = ''
 
   ;(data || []).forEach(s => {
     const div = document.createElement('div')
-
     div.className = 'story-bubble'
-
     div.innerHTML = `<img src="${s.image}">`
 
     div.onclick = () => {
@@ -509,9 +456,7 @@ closeStory.onclick = () => {
 
 async function uploadFile(file, bucket) {
   const ext = file.name.split('.').pop().toLowerCase()
-
-  const safeName =
-    crypto.randomUUID() + '.' + ext
+  const safeName = crypto.randomUUID() + '.' + ext
 
   const upload = await supabase.storage
     .from(bucket)
@@ -535,51 +480,30 @@ async function uploadFile(file, bucket) {
 
 supabase
   .channel('ichat-v3')
-
-  .on(
-    'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'private_chats'
-    },
-    () => {
-      if (mode === 'dm') loadMessages()
-    }
-  )
-
-  .on(
-    'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'group_messages'
-    },
-    () => {
-      if (mode === 'group') loadMessages()
-    }
-  )
-
-  .on(
-    'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'groups'
-    },
-    loadGroups
-  )
-
-  .on(
-    'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'stories'
-    },
-    loadStories
-  )
-
+  .on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: 'private_chats'
+  }, () => {
+    if (mode === 'dm') loadMessages()
+  })
+  .on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: 'group_messages'
+  }, () => {
+    if (mode === 'group') loadMessages()
+  })
+  .on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: 'groups'
+  }, loadGroups)
+  .on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: 'stories'
+  }, loadStories)
   .subscribe(status => {
     console.log('Realtime:', status)
   })
@@ -588,171 +512,4 @@ function escapeHtml(text = '') {
   const div = document.createElement('div')
   div.innerText = text
   return div.innerHTML
-=======
-import { supabase }
-from './supabase.js'
-
-const messages =
-document.getElementById(
-  "messages"
-)
-
-const input =
-document.getElementById(
-  "messageInput"
-)
-
-const sendBtn =
-document.getElementById(
-  "sendBtn"
-)
-
-const fileInput =
-document.getElementById(
-  "fileInput"
-)
-
-sendBtn.onclick =
-sendMessage
-
-async function sendMessage(){
-
-  if(input.value.trim() === "")
-  return
-
-  const {
-    data:{ user }
-  } =
-  await supabase.auth.getUser()
-
-  await supabase
-  .from('messages')
-  .insert([{
-
-    uid:user.id,
-
-    text:input.value,
-
-    type:"text"
-
-  }])
-
-  input.value = ""
-
-}
-
-async function loadMessages(){
-
-  const { data } =
-  await supabase
-
-  .from('messages')
-
-  .select('*')
-
-  .order('created_at')
-
-  messages.innerHTML = ""
-
-  data.forEach(msg=>{
-
-    const div =
-    document.createElement("div")
-
-    div.classList.add("message")
-
-    if(msg.type === "text"){
-
-      div.innerHTML =
-      msg.text
-
-    }
-
-    if(msg.type === "image"){
-
-      div.innerHTML =
-      `<img src="${msg.image}">`
-
-    }
-
-    messages.appendChild(div)
-
-  })
-
-}
-
-loadMessages()
-
-supabase
-.channel('messages')
-
-.on(
-  'postgres_changes',
-  {
-    event:'INSERT',
-    schema:'public',
-    table:'messages'
-  },
-
-(payload)=>{
-
-  loadMessages()
-
-})
-
-.subscribe()
-
-fileInput.onchange =
-async ()=>{
-
-  const file =
-  fileInput.files[0]
-
-  const fileName =
-  Date.now() + file.name
-
-  const {
-    error
-  } =
-  await supabase.storage
-
-  .from('uploads')
-
-  .upload(
-    fileName,
-    file
-  )
-
-  if(error){
-
-    alert(error.message)
-    return
-
-  }
-
-  const { data } =
-  supabase.storage
-
-  .from('uploads')
-
-  .getPublicUrl(fileName)
-
-  const {
-    data:{ user }
-  } =
-  await supabase.auth.getUser()
-
-  await supabase
-  .from('messages')
-  .insert([{
-
-    uid:user.id,
-
-    type:"image",
-
-    image:data.publicUrl
-
-  }])
-
->>>>>>> e5a925c5d6c1af47d36f118296cf2b3842f8ecc9
 }
