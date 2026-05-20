@@ -69,6 +69,32 @@ let activeCall = null
 let isMuted = false
 let cameraOff = false
 
+function safeAvatar(url) {
+  if (!url || url === 'null' || url === 'undefined') return './assets/logo.png'
+
+  const value = String(url).trim()
+  if (
+    !value ||
+    value === 'null' ||
+    value === 'undefined' ||
+    value === 'assets/logo.png' ||
+    value === '/logo.png' ||
+    value === 'logo.png' ||
+    value === 'default.png'
+  ) {
+    return './assets/logo.png'
+  }
+
+  return value
+}
+
+function hasImageUrl(url) {
+  if (!url || url === 'null' || url === 'undefined') return false
+
+  const value = String(url).trim()
+  return !!value && value !== 'null' && value !== 'undefined'
+}
+
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -95,7 +121,7 @@ async function loadMyProfile() {
   if (data) {
     myProfile = data
     myUsername.innerText = '@' + data.username
-    profilePic.src = data.avatar || 'assets/logo.png'
+    profilePic.src = safeAvatar(myProfile.avatar)
     editUsername.value = data.username || ''
     editBio.value = data.bio || ''
     darkModeToggle.checked = data.dark_mode !== false
@@ -155,7 +181,7 @@ window.closeSettingsModal = () => {
 saveProfileBtn.onclick = async () => {
   const username = editUsername.value.trim().toLowerCase()
   const bio = editBio.value.trim()
-  let avatar = myProfile.avatar || ''
+  let avatar = safeAvatar(myProfile.avatar)
 
   if (!username) return alert('Username required')
 
@@ -253,7 +279,7 @@ async function loadRecentChats() {
     div.className = 'chat-item'
 
     div.innerHTML = `
-      <img src="${other.avatar || 'assets/logo.png'}">
+      <img src="${safeAvatar(other.avatar)}">
       <div class="chat-meta">
         <b>@${escapeHtml(other.username)}</b>
         <small>${escapeHtml(previewMessage(msg))}</small>
@@ -300,7 +326,7 @@ searchInput.addEventListener('input', async () => {
     div.className = 'user-result'
 
     div.innerHTML = `
-      <img src="${u.avatar || 'assets/logo.png'}" style="width:48px;height:48px;border-radius:50%;object-fit:cover">
+      <img src="${safeAvatar(u.avatar)}" style="width:48px;height:48px;border-radius:50%;object-fit:cover">
       <div>
         <b>@${escapeHtml(u.username)}</b><br>
         <small>${u.online ? 'online' : lastSeenText(u.last_seen)}</small>
@@ -564,12 +590,12 @@ async function renderMessage(msg, allMessages) {
   }
 
   if (msg.type === 'image') {
-    if (!msg.image || msg.image === 'null') return
+    if (!hasImageUrl(msg.image)) return
     div.innerHTML = `${replyHtml}<img src="${msg.image}">`
   }
 
   else if (msg.type === 'voice') {
-    if (!msg.audio || msg.audio === 'null') return
+    if (!hasImageUrl(msg.audio)) return
     div.innerHTML = `${replyHtml}<audio controls src="${msg.audio}"></audio>`
   }
 
@@ -815,12 +841,13 @@ async function loadStories() {
   storiesList.innerHTML = ''
 
   ;(data || []).forEach(s => {
-    if ((!s.image || s.image === 'null') && !s.text) return
+    const hasStoryImage = hasImageUrl(s.image)
+    if (!hasStoryImage && !s.text) return
 
     const div = document.createElement('div')
     div.className = 'story-bubble'
 
-    if (s.image) {
+    if (hasStoryImage) {
       div.innerHTML = `<img src="${s.image}">`
     } else {
       div.innerHTML = 'T'
@@ -830,7 +857,7 @@ async function loadStories() {
       storyImage.style.display = 'none'
       storyTextBox.style.display = 'none'
 
-      if (s.image) {
+      if (hasStoryImage) {
         storyImage.src = s.image
         storyImage.style.display = 'block'
       } else {
@@ -1129,7 +1156,7 @@ function showNotification(title, body) {
 
   new Notification(title, {
     body,
-    icon: 'assets/logo.png'
+    icon: './assets/logo.png'
   })
 }
 

@@ -282,6 +282,14 @@ body.light .chat-header{
   border:2px solid #00a884;
 }
 
+.profile img,
+.chat-item img,
+.user-result img,
+.story-bubble img{
+  background:#202c33;
+  object-fit:cover;
+}
+
 .reply-preview{
   display:none;
   align-items:center;
