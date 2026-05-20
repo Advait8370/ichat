@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>iChat V6</title>
+  <title>iChat V7</title>
   <link rel="icon" href="./favicon.ico">
   <link rel="shortcut icon" href="./favicon.ico">
   <link rel="stylesheet" href="css/chat.css">
@@ -16,7 +16,7 @@
     <div class="profile" onclick="openProfileModal()">
       <img id="profilePic" src="./assets/logo.png" alt="Profile">
       <div>
-        <h2>iChat V6</h2>
+        <h2>iChat V7</h2>
         <small id="myUsername">Loading...</small>
       </div>
       <button title="Settings" onclick="event.stopPropagation();openSettingsModal()"><i class="fa fa-gear"></i></button>
@@ -25,6 +25,12 @@
     <div class="tabs">
       <button class="active" id="chatsTab">Chats</button>
       <button id="groupsTab">Groups</button>
+    </div>
+
+    <div class="quick-sections">
+      <button id="archivedTab"><i class="fa fa-box-archive"></i> Archived</button>
+      <button id="starredTab"><i class="fa fa-star"></i> Starred</button>
+      <button id="callsTab"><i class="fa fa-clock-rotate-left"></i> Calls</button>
     </div>
 
     <div class="search-box">
@@ -37,11 +43,14 @@
     <div class="group-tools" hidden>
       <input id="groupNameInput" placeholder="New group name">
       <button id="createGroupBtn"><i class="fa fa-plus"></i> Create Group</button>
+      <input id="groupInviteCodeInput" placeholder="Invite code or link">
+      <button id="joinInviteBtn"><i class="fa fa-link"></i> Join Invite</button>
       <input id="groupInviteInput" placeholder="Username to add">
       <button id="addUserToGroupBtn"><i class="fa fa-user-plus"></i> Add To Group</button>
     </div>
 
     <div id="groupList" hidden></div>
+    <div id="sidePanelList" hidden></div>
 
     <button id="logoutBtn" class="logout"><i class="fa fa-right-from-bracket"></i> Logout</button>
   </aside>
@@ -57,6 +66,10 @@
 
       <div class="call-buttons">
         <button id="messageSearchToggle" title="Search messages"><i class="fa fa-magnifying-glass"></i></button>
+        <button id="exportChatBtn" title="Export chat"><i class="fa fa-file-export"></i></button>
+        <button id="clearChatBtn" title="Clear chat"><i class="fa fa-broom"></i></button>
+        <button id="archiveChatBtn" title="Archive chat"><i class="fa fa-box-archive"></i></button>
+        <button id="reportUserBtn" title="Report user"><i class="fa fa-flag"></i></button>
         <button id="pinChatBtn" title="Pin chat"><i class="fa fa-thumbtack"></i></button>
         <button id="muteChatBtn" title="Mute chat"><i class="fa fa-bell"></i></button>
         <button id="blockUserBtn" title="Block user"><i class="fa fa-ban"></i></button>
@@ -89,16 +102,38 @@
       <button id="cancelFileBtn"><i class="fa fa-xmark"></i></button>
     </div>
 
+    <div id="dropOverlay" class="drop-overlay" hidden>Drop files to send</div>
+
     <section id="messages" class="messages">
       <div class="empty-chat">Search user or open group to start chatting.</div>
     </section>
 
     <footer class="message-input">
       <input id="messageInput" placeholder="Message">
+      <button id="emojiBtn" title="Emoji"><i class="fa fa-face-smile"></i></button>
       <label title="Attach file"><i class="fa fa-paperclip"></i><input id="fileInput" type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" hidden></label>
+      <span id="voiceTimer" class="voice-timer" hidden>00:00</span>
       <button id="sendBtn"><i class="fa fa-paper-plane"></i></button>
     </footer>
+    <div id="emojiPicker" class="emoji-picker" hidden></div>
   </main>
+</div>
+
+<div id="appLockOverlay" class="app-lock" hidden>
+  <div class="modal-box">
+    <img class="lock-logo" src="./assets/logo.png" alt="iChat">
+    <h2>iChat Locked</h2>
+    <input id="unlockPinInput" type="password" inputmode="numeric" maxlength="12" placeholder="Enter PIN">
+    <button id="unlockPinBtn">Unlock</button>
+  </div>
+</div>
+
+<div id="emailVerifyOverlay" class="app-lock" hidden>
+  <div class="modal-box">
+    <h2>Email Verification Needed</h2>
+    <p>Your email is not confirmed yet. Please verify your email to keep your account secure.</p>
+    <button id="dismissVerifyBtn">Continue</button>
+  </div>
 </div>
 
 <div id="storyViewer" class="story-viewer">
@@ -106,6 +141,7 @@
   <div id="storyTextBox"></div>
   <img id="storyImage" alt="Story">
   <video id="storyVideo" controls></video>
+  <div id="storyActions" class="story-actions"></div>
 </div>
 
 <div id="profileModal" class="modal">
@@ -127,6 +163,17 @@
     <label><input id="notifyToggle" type="checkbox" checked> Notifications</label>
     <label><input id="hideOnlineToggle" type="checkbox"> Hide Online Status</label>
     <label><input id="hideLastSeenToggle" type="checkbox"> Hide Last Seen</label>
+    <label>Status Privacy
+      <select id="statusPrivacySelect">
+        <option value="everyone">Everyone</option>
+        <option value="contacts">Contacts / Users only</option>
+        <option value="nobody">Nobody</option>
+      </select>
+    </label>
+    <h3>App Lock PIN</h3>
+    <input id="appLockPinInput" type="password" inputmode="numeric" maxlength="12" placeholder="New PIN">
+    <button id="saveAppLockBtn">Set / Change PIN</button>
+    <button id="removeAppLockBtn" class="ghost-btn">Remove PIN</button>
     <button id="deleteAccountBtn" class="danger">Delete Account</button>
   </div>
 </div>
@@ -136,10 +183,36 @@
     <button class="close" onclick="closeGroupInfoModal()"><i class="fa fa-xmark"></i></button>
     <img id="groupInfoImage" src="./assets/logo.png" alt="Group">
     <h2 id="groupInfoName">Group Info</h2>
+    <input id="groupNameEditInput" placeholder="Group name">
+    <input id="groupDescriptionInput" placeholder="Group description">
+    <button id="saveGroupInfoBtn">Save Group Info</button>
     <label id="groupImageLabel" class="upload-line"><i class="fa fa-camera"></i> Change Group Photo<input id="groupImageInput" type="file" accept="image/*" hidden></label>
+    <div class="invite-box">
+      <input id="groupInviteLinkInput" readonly placeholder="Invite link">
+      <button id="generateInviteBtn">Generate Invite</button>
+      <button id="resetInviteBtn" class="ghost-btn">Reset Invite</button>
+    </div>
     <h3>Members</h3>
     <div id="groupMembersList"></div>
     <button id="leaveGroupBtn" class="danger">Leave Group</button>
+  </div>
+</div>
+
+<div id="reportModal" class="modal">
+  <div class="modal-box">
+    <button class="close" onclick="closeReportModal()"><i class="fa fa-xmark"></i></button>
+    <h2>Report User</h2>
+    <input id="reportReasonInput" placeholder="Reason">
+    <textarea id="reportDescriptionInput" placeholder="Description"></textarea>
+    <button id="submitReportBtn">Submit Report</button>
+  </div>
+</div>
+
+<div id="messageInfoModal" class="modal">
+  <div class="modal-box">
+    <button class="close" onclick="closeMessageInfoModal()"><i class="fa fa-xmark"></i></button>
+    <h2>Message Info</h2>
+    <div id="messageInfoContent"></div>
   </div>
 </div>
 
@@ -164,6 +237,7 @@
 
 <div id="callModal" class="modal">
   <div class="call-screen">
+    <div id="callStatusText" class="call-status-text">Connecting...</div>
     <div class="video-wrap">
       <video id="remoteVideo" autoplay playsinline></video>
       <video id="localVideo" autoplay muted playsinline></video>

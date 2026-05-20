@@ -17,6 +17,10 @@ const searchResults = $('searchResults')
 const recentChats = $('recentChats')
 const chatsTab = $('chatsTab')
 const groupsTab = $('groupsTab')
+const archivedTab = $('archivedTab')
+const starredTab = $('starredTab')
+const callsTab = $('callsTab')
+const sidePanelList = $('sidePanelList')
 const logoutBtn = $('logoutBtn')
 const chatName = $('chatName')
 const chatAvatar = $('chatAvatar')
@@ -25,6 +29,8 @@ const myUsername = $('myUsername')
 const groupNameInput = $('groupNameInput')
 const createGroupBtn = $('createGroupBtn')
 const groupInviteInput = $('groupInviteInput')
+const groupInviteCodeInput = $('groupInviteCodeInput')
+const joinInviteBtn = $('joinInviteBtn')
 const addUserToGroupBtn = $('addUserToGroupBtn')
 const groupTools = document.querySelector('.group-tools')
 const groupList = $('groupList')
@@ -44,21 +50,48 @@ const messageSearchToggle = $('messageSearchToggle')
 const messageSearchBox = $('messageSearchBox')
 const messageSearchInput = $('messageSearchInput')
 const clearMessageSearchBtn = $('clearMessageSearchBtn')
+const exportChatBtn = $('exportChatBtn')
+const clearChatBtn = $('clearChatBtn')
+const archiveChatBtn = $('archiveChatBtn')
+const reportUserBtn = $('reportUserBtn')
 const pinChatBtn = $('pinChatBtn')
 const muteChatBtn = $('muteChatBtn')
 const blockUserBtn = $('blockUserBtn')
 const groupInfoBtn = $('groupInfoBtn')
 const mobileBackBtn = $('mobileBackBtn')
+const emojiBtn = $('emojiBtn')
+const emojiPicker = $('emojiPicker')
+const voiceTimer = $('voiceTimer')
+const dropOverlay = $('dropOverlay')
+
+const appLockOverlay = $('appLockOverlay')
+const unlockPinInput = $('unlockPinInput')
+const unlockPinBtn = $('unlockPinBtn')
+const emailVerifyOverlay = $('emailVerifyOverlay')
+const dismissVerifyBtn = $('dismissVerifyBtn')
 
 const groupInfoModal = $('groupInfoModal')
 const groupInfoImage = $('groupInfoImage')
 const groupInfoName = $('groupInfoName')
+const groupNameEditInput = $('groupNameEditInput')
+const groupDescriptionInput = $('groupDescriptionInput')
+const saveGroupInfoBtn = $('saveGroupInfoBtn')
 const groupImageLabel = $('groupImageLabel')
 const groupImageInput = $('groupImageInput')
+const groupInviteLinkInput = $('groupInviteLinkInput')
+const generateInviteBtn = $('generateInviteBtn')
+const resetInviteBtn = $('resetInviteBtn')
 const groupMembersList = $('groupMembersList')
 const leaveGroupBtn = $('leaveGroupBtn')
 const forwardModal = $('forwardModal')
 const forwardTargets = $('forwardTargets')
+const reportModal = $('reportModal')
+const reportReasonInput = $('reportReasonInput')
+const reportDescriptionInput = $('reportDescriptionInput')
+const submitReportBtn = $('submitReportBtn')
+const messageInfoModal = $('messageInfoModal')
+const messageInfoContent = $('messageInfoContent')
+const storyActions = $('storyActions')
 
 const audioCallBtn = $('audioCallBtn')
 const videoCallBtn = $('videoCallBtn')
@@ -73,6 +106,7 @@ const remoteVideo = $('remoteVideo')
 const muteBtn = $('muteBtn')
 const cameraBtn = $('cameraBtn')
 const endCallBtn = $('endCallBtn')
+const callStatusText = $('callStatusText')
 
 const profileModal = $('profileModal')
 const settingsModal = $('settingsModal')
@@ -84,6 +118,10 @@ const darkModeToggle = $('darkModeToggle')
 const notifyToggle = $('notifyToggle')
 const hideOnlineToggle = $('hideOnlineToggle')
 const hideLastSeenToggle = $('hideLastSeenToggle')
+const statusPrivacySelect = $('statusPrivacySelect')
+const appLockPinInput = $('appLockPinInput')
+const saveAppLockBtn = $('saveAppLockBtn')
+const removeAppLockBtn = $('removeAppLockBtn')
 const deleteAccountBtn = $('deleteAccountBtn')
 
 let currentChatUser = null
@@ -106,6 +144,14 @@ let blockedByMe = new Set()
 let blockedMe = new Set()
 let mutedChats = new Set()
 let pinnedChats = new Set()
+let archivedChats = new Set()
+let starredMessages = new Set()
+let clearedChats = new Map()
+let voiceTimerInterval = null
+let voiceStartedAt = 0
+let missedCallTimer = null
+let ringingOscillator = null
+let currentStory = null
 
 let peer = null
 let localStream = null
@@ -130,10 +176,15 @@ if (!user) {
 
 async function init() {
   wireEvents()
+  setupAppLock()
+  setupEmailVerificationNotice()
   await loadMyProfile()
   await loadPrivacyState()
+  setupEmojiPicker()
+  setupDragAndDrop()
   showSidebarView('chats')
   await Promise.all([loadRecentChats(), loadGroups(), loadStories()])
+  await handleInviteFromUrl()
   setupRealtime()
   requestNotificationPermission()
 }
@@ -148,8 +199,12 @@ function wireEvents() {
   deleteAccountBtn.onclick = deleteAccount
   chatsTab.onclick = () => showSidebarView('chats')
   groupsTab.onclick = () => showSidebarView('groups')
+  archivedTab.onclick = showArchivedChats
+  starredTab.onclick = showStarredMessages
+  callsTab.onclick = showCallHistory
   searchInput.oninput = searchUsers
   createGroupBtn.onclick = createGroup
+  joinInviteBtn.onclick = joinGroupByInvite
   addUserToGroupBtn.onclick = addUserToGroup
   sendBtn.onclick = sendMessage
   input.onkeydown = e => {
@@ -166,12 +221,26 @@ function wireEvents() {
   messageSearchToggle.onclick = toggleMessageSearch
   messageSearchInput.oninput = () => renderMessages(allCurrentMessages)
   clearMessageSearchBtn.onclick = clearMessageSearch
+  exportChatBtn.onclick = exportCurrentChat
+  clearChatBtn.onclick = clearCurrentChatForMe
+  archiveChatBtn.onclick = toggleArchiveCurrentChat
+  reportUserBtn.onclick = openReportModal
   pinChatBtn.onclick = togglePinCurrentChat
   muteChatBtn.onclick = toggleMuteCurrentChat
   blockUserBtn.onclick = toggleBlockCurrentUser
   groupInfoBtn.onclick = openGroupInfoModal
+  saveGroupInfoBtn.onclick = saveGroupInfo
+  generateInviteBtn.onclick = generateGroupInvite
+  resetInviteBtn.onclick = resetGroupInvite
   groupImageInput.onchange = updateGroupImage
   leaveGroupBtn.onclick = leaveCurrentGroup
+  submitReportBtn.onclick = submitReport
+  unlockPinBtn.onclick = unlockApp
+  unlockPinInput.onkeydown = e => { if (e.key === 'Enter') unlockApp() }
+  dismissVerifyBtn.onclick = () => emailVerifyOverlay.hidden = true
+  saveAppLockBtn.onclick = saveAppLockPin
+  removeAppLockBtn.onclick = removeAppLockPin
+  emojiBtn.onclick = () => emojiPicker.hidden = !emojiPicker.hidden
   mobileBackBtn.onclick = () => document.body.classList.remove('chat-open')
   audioCallBtn.onclick = () => startCall('audio')
   videoCallBtn.onclick = () => startCall('video')
@@ -194,6 +263,44 @@ function hasUrl(url) {
   if (!url || url === 'null' || url === 'undefined') return false
   const value = String(url).trim()
   return !!value && value !== 'null' && value !== 'undefined'
+}
+
+function setupAppLock() {
+  if (localStorage.getItem(`ichat_pin_${user.id}`)) {
+    appLockOverlay.hidden = false
+    unlockPinInput.focus()
+  }
+}
+
+function unlockApp() {
+  const saved = localStorage.getItem(`ichat_pin_${user.id}`)
+  if (!saved || unlockPinInput.value === saved) {
+    appLockOverlay.hidden = true
+    unlockPinInput.value = ''
+    return
+  }
+  alert('Wrong PIN')
+}
+
+function saveAppLockPin() {
+  const pin = appLockPinInput.value.trim()
+  if (pin.length < 4) return alert('Use at least 4 digits')
+  localStorage.setItem(`ichat_pin_${user.id}`, pin)
+  appLockPinInput.value = ''
+  alert('App lock PIN saved')
+}
+
+function removeAppLockPin() {
+  localStorage.removeItem(`ichat_pin_${user.id}`)
+  appLockPinInput.value = ''
+  alert('App lock PIN removed')
+}
+
+function setupEmailVerificationNotice() {
+  if (!user.email_confirmed_at && !sessionStorage.getItem(`ichat_verify_seen_${user.id}`)) {
+    emailVerifyOverlay.hidden = false
+    sessionStorage.setItem(`ichat_verify_seen_${user.id}`, '1')
+  }
 }
 
 function escapeHtml(text = '') {
@@ -233,6 +340,7 @@ async function loadMyProfile() {
     notifyToggle.checked = data.notifications !== false
     hideOnlineToggle.checked = data.hide_online === true
     hideLastSeenToggle.checked = data.hide_last_seen === true
+    statusPrivacySelect.value = data.status_privacy || 'everyone'
     document.body.classList.toggle('light', data.dark_mode === false)
     await supabase.from('users').update({
       online: data.hide_online ? false : true,
@@ -252,7 +360,8 @@ async function loadMyProfile() {
     notifications: true,
     dark_mode: true,
     hide_online: false,
-    hide_last_seen: false
+    hide_last_seen: false,
+    status_privacy: 'everyone'
   }])
   if (insert.error) return alert(insert.error.message)
   await loadMyProfile()
@@ -265,10 +374,18 @@ async function loadPrivacyState() {
     supabase.from('muted_chats').select('chat_type, chat_id').eq('uid', user.id),
     supabase.from('pinned_chats').select('chat_type, chat_id').eq('uid', user.id)
   ])
+  const [archived, starred, cleared] = await Promise.all([
+    supabase.from('archived_chats').select('chat_type, chat_id').eq('uid', user.id),
+    supabase.from('starred_messages').select('chat_type, message_id').eq('uid', user.id),
+    supabase.from('cleared_chats').select('chat_type, chat_id, cleared_at').eq('uid', user.id)
+  ])
   blockedByMe = new Set((blockedOut.data || []).map(r => r.blocked_id))
   blockedMe = new Set((blockedIn.data || []).map(r => r.blocker_id))
   mutedChats = new Set((muted.data || []).map(r => `${r.chat_type}:${r.chat_id}`))
   pinnedChats = new Set((pinned.data || []).map(r => `${r.chat_type}:${r.chat_id}`))
+  archivedChats = new Set((archived.data || []).map(r => `${r.chat_type}:${r.chat_id}`))
+  starredMessages = new Set((starred.data || []).map(r => `${r.chat_type}:${r.message_id}`))
+  clearedChats = new Map((cleared.data || []).map(r => [`${r.chat_type}:${r.chat_id}`, r.cleared_at]))
   updateChatButtons()
 }
 
@@ -314,6 +431,7 @@ async function saveSettings() {
     notifications: notifyToggle.checked,
     hide_online: hideOnlineToggle.checked,
     hide_last_seen: hideLastSeenToggle.checked,
+    status_privacy: statusPrivacySelect.value,
     online: hideOnlineToggle.checked ? false : true
   }
   document.body.classList.toggle('light', !settings.dark_mode)
@@ -336,9 +454,90 @@ function showSidebarView(view) {
   searchBox.hidden = !isChats
   groupTools.hidden = isChats
   groupList.hidden = isChats
+  sidePanelList.hidden = true
+  sidePanelList.style.display = 'none'
   recentChats.style.display = isChats && !searchInput.value.trim() ? 'block' : 'none'
   searchResults.style.display = isChats && searchInput.value.trim() ? 'block' : 'none'
   if (!isChats) loadGroups()
+}
+
+function showSidePanel(title) {
+  searchResults.style.display = 'none'
+  recentChats.style.display = 'none'
+  groupList.hidden = true
+  groupTools.hidden = true
+  searchBox.hidden = true
+  sidePanelList.hidden = false
+  sidePanelList.style.display = 'block'
+  sidePanelList.innerHTML = `<div class="side-item"><b>${escapeHtml(title)}</b></div>`
+}
+
+async function showArchivedChats() {
+  showSidePanel('Archived Chats')
+  const rows = [...archivedChats]
+  if (!rows.length) {
+    sidePanelList.innerHTML += '<div class="empty-chat">No archived chats.</div>'
+    return
+  }
+  for (const key of rows) {
+    const [type, id] = key.split(':')
+    if (type === 'dm') {
+      const { data } = await supabase.from('users').select('*').eq('uid', id).maybeSingle()
+      if (data) appendSideItem('@' + data.username, 'Private chat', safeAvatar(data.avatar), () => openDM(data))
+    } else {
+      const { data } = await supabase.from('groups').select('*').eq('id', id).maybeSingle()
+      if (data) appendSideItem(data.name, 'Group chat', safeAvatar(data.image), () => openGroup(data))
+    }
+  }
+}
+
+async function showStarredMessages() {
+  showSidePanel('Starred Messages')
+  if (!starredMessages.size) {
+    sidePanelList.innerHTML += '<div class="empty-chat">No starred messages.</div>'
+    return
+  }
+  for (const key of starredMessages) {
+    const [type, id] = key.split(':')
+    const table = type === 'dm' ? 'private_chats' : 'group_messages'
+    const { data } = await supabase.from(table).select('*').eq('id', id).maybeSingle()
+    if (data) appendSideItem(previewMessage(data), new Date(data.created_at).toLocaleString(), LOGO, () => {})
+  }
+}
+
+async function showCallHistory() {
+  showSidePanel('Call History')
+  const { data } = await supabase
+    .from('call_history')
+    .select('*')
+    .or(`caller_id.eq.${user.id},receiver_id.eq.${user.id}`)
+    .order('started_at', { ascending: false })
+    .limit(50)
+  if (!(data || []).length) {
+    sidePanelList.innerHTML += '<div class="empty-chat">No calls yet.</div>'
+    return
+  }
+  ;(data || []).forEach(call => {
+    const other = call.caller_id === user.id ? call.receiver_id : call.caller_id
+    appendSideItem(`${call.type || 'Call'} - ${call.status}`, other, LOGO, () => {})
+  })
+}
+
+function appendSideItem(title, subtitle, avatar, onclick) {
+  const div = document.createElement('div')
+  div.className = 'side-item'
+  div.innerHTML = `<img src="${escapeHtml(safeAvatar(avatar))}" alt=""><div class="chat-meta"><b>${escapeHtml(title)}</b><small>${escapeHtml(subtitle)}</small></div>`
+  div.onclick = onclick
+  sidePanelList.appendChild(div)
+}
+
+async function handleInviteFromUrl() {
+  const code = new URLSearchParams(location.search).get('invite')
+  if (!code) return
+  groupInviteCodeInput.value = code
+  showSidebarView('groups')
+  await joinGroupByInvite()
+  history.replaceState({}, '', location.pathname)
 }
 
 async function loadRecentChats() {
@@ -355,6 +554,9 @@ async function loadRecentChats() {
     if (!otherId || otherId === user.id) return
     const old = chatMap.get(otherId)
     if (!old || new Date(msg.created_at) > new Date(old.created_at)) chatMap.set(otherId, msg)
+  })
+  archivedChats.forEach(key => {
+    if (key.startsWith('dm:')) chatMap.delete(key.slice(3))
   })
 
   const items = []
@@ -469,6 +671,7 @@ async function loadGroups() {
   ;(data || []).forEach(row => {
     const g = row.groups
     if (!g) return
+    if (archivedChats.has(`group:${g.id}`)) return
     const div = document.createElement('div')
     div.className = 'group-item'
     div.innerHTML = `
@@ -496,11 +699,34 @@ async function openGroup(g) {
   loadMessages()
 }
 
+async function joinGroupByInvite() {
+  const raw = groupInviteCodeInput.value.trim()
+  if (!raw) return alert('Enter invite code or link')
+  const inviteCode = raw.split('/').pop().split('=').pop().trim()
+  const { data: invite, error } = await supabase.from('group_invites').select('*, groups(*)').eq('invite_code', inviteCode).eq('active', true).maybeSingle()
+  if (error) return alert(error.message)
+  if (!invite?.groups) return alert('Invite not found')
+  const existing = await supabase.from('group_members').select('id').eq('group_id', invite.group_id).eq('uid', user.id).maybeSingle()
+  if (existing.data) {
+    groupInviteCodeInput.value = ''
+    await loadGroups()
+    openGroup(invite.groups)
+    return
+  }
+  const insert = await supabase.from('group_members').insert([{ group_id: invite.group_id, uid: user.id, role: 'member' }])
+  if (insert.error && !insert.error.message.includes('duplicate')) return alert(insert.error.message)
+  groupInviteCodeInput.value = ''
+  await loadGroups()
+  openGroup(invite.groups)
+}
+
 async function loadGroupMembers() {
   if (!currentGroup) return
-  const { data, error } = await supabase.from('group_members').select('id, group_id, uid, role, users(*)').eq('group_id', currentGroup.id)
+  const { data, error } = await supabase.from('group_members').select('id, group_id, uid, role').eq('group_id', currentGroup.id)
   if (error) return console.log(error)
-  currentGroupMembers = data || []
+  const members = data || []
+  const profiles = await Promise.all(members.map(m => supabase.from('users').select('*').eq('uid', m.uid).maybeSingle()))
+  currentGroupMembers = members.map((member, index) => ({ ...member, users: profiles[index].data || null }))
   currentGroupMember = currentGroupMembers.find(m => m.uid === user.id) || null
 }
 
@@ -529,7 +755,15 @@ async function openGroupInfoModal() {
   await loadGroupMembers()
   groupInfoImage.src = safeAvatar(currentGroup.image)
   groupInfoName.innerText = currentGroup.name
+  groupNameEditInput.value = currentGroup.name || ''
+  groupDescriptionInput.value = currentGroup.description || ''
+  groupNameEditInput.disabled = !isGroupAdmin()
+  groupDescriptionInput.disabled = !isGroupAdmin()
+  saveGroupInfoBtn.disabled = !isGroupAdmin()
   groupImageLabel.hidden = !isGroupAdmin()
+  generateInviteBtn.disabled = !isGroupAdmin()
+  resetInviteBtn.disabled = !isGroupAdmin()
+  groupInviteLinkInput.value = currentGroup.invite_code ? inviteUrl(currentGroup.invite_code) : ''
   groupMembersList.innerHTML = ''
   currentGroupMembers.forEach(member => {
     const u = member.users || {}
@@ -541,11 +775,55 @@ async function openGroupInfoModal() {
         <b>@${escapeHtml(u.username || member.uid)}</b>
         <small>${member.role === 'admin' ? '<span class="admin-badge">Admin</span>' : 'Member'}</small>
       </div>
-      ${isGroupAdmin() && member.uid !== user.id ? `<button class="danger" onclick="removeGroupMember(${member.id})">Remove</button>` : ''}
+      ${isGroupAdmin() && member.uid !== user.id ? `
+        <button onclick="toggleMemberAdmin(${member.id}, '${member.role === 'admin' ? 'member' : 'admin'}')">${member.role === 'admin' ? 'Demote' : 'Promote'}</button>
+        <button class="danger" onclick="removeGroupMember(${member.id})">Remove</button>
+      ` : ''}
     `
     groupMembersList.appendChild(div)
   })
   groupInfoModal.style.display = 'grid'
+}
+
+async function saveGroupInfo() {
+  if (!currentGroup || !isGroupAdmin()) return alert('Only admins can edit group info')
+  const patch = {
+    name: groupNameEditInput.value.trim() || currentGroup.name,
+    description: groupDescriptionInput.value.trim()
+  }
+  const { error } = await supabase.from('groups').update(patch).eq('id', currentGroup.id)
+  if (error) return alert(error.message)
+  currentGroup = { ...currentGroup, ...patch }
+  chatName.innerText = currentGroup.name
+  await openGroupInfoModal()
+  loadGroups()
+}
+
+function inviteUrl(code) {
+  return `${location.origin}${location.pathname}?invite=${encodeURIComponent(code)}`
+}
+
+async function generateGroupInvite() {
+  if (!currentGroup || !isGroupAdmin()) return alert('Only admins can generate invites')
+  const code = crypto.randomUUID().slice(0, 8)
+  await supabase.from('group_invites').update({ active: false }).eq('group_id', currentGroup.id)
+  const { error } = await supabase.from('group_invites').insert([{ group_id: currentGroup.id, invite_code: code, created_by: user.id, active: true }])
+  if (error) return alert(error.message)
+  await supabase.from('groups').update({ invite_code: code }).eq('id', currentGroup.id)
+  currentGroup.invite_code = code
+  groupInviteLinkInput.value = inviteUrl(code)
+}
+
+async function resetGroupInvite() {
+  if (!currentGroup || !isGroupAdmin()) return alert('Only admins can reset invites')
+  await generateGroupInvite()
+}
+
+window.toggleMemberAdmin = async (memberId, role) => {
+  if (!isGroupAdmin()) return alert('Only admins can change roles')
+  await supabase.from('group_members').update({ role }).eq('id', memberId)
+  await loadGroupMembers()
+  await openGroupInfoModal()
 }
 
 window.removeGroupMember = async memberId => {
@@ -585,12 +863,17 @@ function updateChatButtons() {
   const hasChat = !!getCurrentChatId()
   pinChatBtn.disabled = !hasChat
   muteChatBtn.disabled = !hasChat
+  archiveChatBtn.disabled = !hasChat
+  clearChatBtn.disabled = !hasChat
+  exportChatBtn.disabled = !hasChat
   blockUserBtn.hidden = mode !== 'dm'
+  reportUserBtn.hidden = mode !== 'dm'
   groupInfoBtn.hidden = mode !== 'group'
   audioCallBtn.disabled = mode !== 'dm' || !currentChatUser
   videoCallBtn.disabled = mode !== 'dm' || !currentChatUser
   pinChatBtn.classList.toggle('active', isCurrentChatPinned())
   muteChatBtn.classList.toggle('active', isCurrentChatMuted())
+  archiveChatBtn.classList.toggle('active', archivedChats.has(chatKey()))
   blockUserBtn.classList.toggle('active', currentChatUser && blockedByMe.has(currentChatUser.uid))
   blockUserBtn.title = currentChatUser && blockedByMe.has(currentChatUser.uid) ? 'Unblock user' : 'Block user'
 }
@@ -625,6 +908,41 @@ async function toggleMuteCurrentChat() {
   loadRecentChats()
 }
 
+async function toggleArchiveCurrentChat() {
+  const id = getCurrentChatId()
+  if (!id) return
+  const key = chatKey()
+  if (archivedChats.has(key)) {
+    await supabase.from('archived_chats').delete().eq('uid', user.id).eq('chat_type', mode).eq('chat_id', id)
+    archivedChats.delete(key)
+  } else {
+    await supabase.from('archived_chats').upsert([{ uid: user.id, chat_type: mode, chat_id: id }], { onConflict: 'uid,chat_type,chat_id' })
+    archivedChats.add(key)
+  }
+  updateChatButtons()
+  loadRecentChats()
+}
+
+async function clearCurrentChatForMe() {
+  const id = getCurrentChatId()
+  if (!id || !confirm('Clear this chat for you?')) return
+  const clearedAt = new Date().toISOString()
+  await supabase.from('cleared_chats').upsert([{ uid: user.id, chat_type: mode, chat_id: id, cleared_at: clearedAt }], { onConflict: 'uid,chat_type,chat_id' })
+  clearedChats.set(chatKey(), clearedAt)
+  await loadMessages()
+}
+
+function exportCurrentChat() {
+  if (!allCurrentMessages.length) return alert('No messages to export')
+  const lines = allCurrentMessages.map(m => `[${new Date(m.created_at).toLocaleString()}] ${m.sender_id === user.id ? 'Me' : m.sender_id}: ${messageSearchText(m)}`)
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `ichat-${mode}-${getCurrentChatId() || 'chat'}.txt`
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+
 async function toggleBlockCurrentUser() {
   if (!currentChatUser) return
   if (blockedByMe.has(currentChatUser.uid)) {
@@ -635,6 +953,26 @@ async function toggleBlockCurrentUser() {
     blockedByMe.add(currentChatUser.uid)
   }
   updateChatButtons()
+}
+
+function openReportModal() {
+  if (!currentChatUser) return
+  reportReasonInput.value = ''
+  reportDescriptionInput.value = ''
+  reportModal.style.display = 'grid'
+}
+
+window.closeReportModal = () => reportModal.style.display = 'none'
+
+async function submitReport() {
+  if (!currentChatUser) return
+  const reason = reportReasonInput.value.trim()
+  const description = reportDescriptionInput.value.trim()
+  if (!reason) return alert('Enter a reason')
+  const { error } = await supabase.from('reports').insert([{ reporter_id: user.id, reported_id: currentChatUser.uid, reason, description }])
+  if (error) return alert(error.message)
+  reportModal.style.display = 'none'
+  alert('Report submitted')
 }
 
 function isBlockedChat() {
@@ -709,6 +1047,8 @@ async function loadMessages() {
     messages.innerHTML = '<div class="empty-chat">Search user or open group to start chatting.</div>'
     return
   }
+  const clearedAt = clearedChats.get(chatKey())
+  if (clearedAt) all = all.filter(msg => new Date(msg.created_at) > new Date(clearedAt))
   all.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
   allCurrentMessages = all
   await renderMessages(all)
@@ -751,6 +1091,8 @@ async function renderMessage(msg, allMessages, highlighted = false) {
     <span class="msg-time">${formatTime(msg.created_at)}${msg.edited ? ' edited' : ''}${msg.sender_id === user.id && mode === 'dm' ? ` <span class="tick">${msg.seen ? '✓✓' : '✓'}</span>` : ''}</span>
     <div class="msg-actions">
       <button onclick="replyMessage(${msg.id})">Reply</button>
+      <button class="${starredMessages.has(`${mode}:${msg.id}`) ? 'starred' : ''}" onclick="toggleStarMessage(${msg.id})">★</button>
+      <button onclick="showMessageInfo(${msg.id})">Info</button>
       <button onclick="copyMessage(${msg.id})">Copy</button>
       <button onclick="forwardMessage(${msg.id})">Forward</button>
       ${msg.sender_id === user.id && msg.type === 'text' ? `<button onclick="editMessage(${msg.id})">Edit</button>` : ''}
@@ -824,6 +1166,32 @@ window.copyMessage = async messageId => {
   if (!msg) return
   await navigator.clipboard.writeText(messageSearchText(msg))
 }
+
+window.toggleStarMessage = async messageId => {
+  const key = `${mode}:${messageId}`
+  if (starredMessages.has(key)) {
+    await supabase.from('starred_messages').delete().eq('uid', user.id).eq('chat_type', mode).eq('message_id', messageId)
+    starredMessages.delete(key)
+  } else {
+    await supabase.from('starred_messages').upsert([{ uid: user.id, chat_type: mode, message_id: messageId }], { onConflict: 'uid,chat_type,message_id' })
+    starredMessages.add(key)
+  }
+  renderMessages(allCurrentMessages)
+}
+
+window.showMessageInfo = messageId => {
+  const msg = allCurrentMessages.find(m => m.id === messageId)
+  if (!msg) return
+  messageInfoContent.innerHTML = `
+    <div class="info-row"><span>Sender</span><span>${escapeHtml(msg.sender_id === user.id ? 'Me' : msg.sender_id)}</span></div>
+    <div class="info-row"><span>Sent</span><span>${new Date(msg.created_at).toLocaleString()}</span></div>
+    <div class="info-row"><span>Seen</span><span>${msg.seen ? 'Seen' : 'Not seen'}</span></div>
+    <div class="info-row"><span>Type</span><span>${escapeHtml(msg.type || 'text')}</span></div>
+  `
+  messageInfoModal.style.display = 'grid'
+}
+
+window.closeMessageInfoModal = () => messageInfoModal.style.display = 'none'
 
 window.forwardMessage = async messageId => {
   forwardSource = allCurrentMessages.find(m => m.id === messageId)
@@ -942,6 +1310,7 @@ async function toggleVoiceRecording() {
   if (mediaRecorder && mediaRecorder.state === 'recording') {
     mediaRecorder.stop()
     voiceBtn.innerHTML = '<i class="fa fa-microphone"></i>'
+    stopVoiceTimer()
     return
   }
   if (isBlockedChat()) return alert('Messages cannot be sent because this user is blocked.')
@@ -957,7 +1326,67 @@ async function toggleVoiceRecording() {
     if (uploaded) await insertMessage({ type: 'voice', audio: uploaded.url, file_url: uploaded.url, file_name: 'voice.webm', file_type: 'audio/webm' })
   }
   mediaRecorder.start()
+  startVoiceTimer()
   voiceBtn.innerHTML = '<i class="fa fa-stop"></i>'
+}
+
+function startVoiceTimer() {
+  voiceStartedAt = Date.now()
+  voiceTimer.hidden = false
+  voiceTimerInterval = setInterval(() => {
+    const secs = Math.floor((Date.now() - voiceStartedAt) / 1000)
+    voiceTimer.innerText = `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`
+  }, 250)
+}
+
+function stopVoiceTimer() {
+  clearInterval(voiceTimerInterval)
+  voiceTimerInterval = null
+  voiceTimer.hidden = true
+  voiceTimer.innerText = '00:00'
+}
+
+function setupEmojiPicker() {
+  const emojis = ['😀','😂','😍','😎','😭','😡','👍','🙏','❤️','🔥','🎉','✅','😮','😢','🤔','👏','💯','✨','🥳','👀','😴','🙌','💙','🫶']
+  emojiPicker.innerHTML = ''
+  emojis.forEach(emoji => {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.innerText = emoji
+    btn.onclick = () => {
+      input.value += emoji
+      input.focus()
+      emojiPicker.hidden = true
+    }
+    emojiPicker.appendChild(btn)
+  })
+}
+
+function setupDragAndDrop() {
+  ;['dragenter', 'dragover'].forEach(eventName => {
+    document.addEventListener(eventName, e => {
+      e.preventDefault()
+      if (getCurrentChatId()) dropOverlay.hidden = false
+    })
+  })
+  ;['dragleave', 'drop'].forEach(eventName => {
+    document.addEventListener(eventName, e => {
+      e.preventDefault()
+      dropOverlay.hidden = true
+    })
+  })
+  document.addEventListener('drop', e => {
+    const file = e.dataTransfer?.files?.[0]
+    if (!file) return
+    pendingFile = file
+    if (pendingFilePreviewUrl) URL.revokeObjectURL(pendingFilePreviewUrl)
+    pendingFilePreviewUrl = URL.createObjectURL(file)
+    const kind = fileKind(file)
+    if (kind === 'image') filePreviewContent.innerHTML = `<img src="${pendingFilePreviewUrl}" alt=""><b>${escapeHtml(file.name)}</b>`
+    else if (kind === 'video') filePreviewContent.innerHTML = `<video src="${pendingFilePreviewUrl}" controls></video><b>${escapeHtml(file.name)}</b>`
+    else filePreviewContent.innerHTML = `<div class="file-card"><i class="fa fa-file"></i><b>${escapeHtml(file.name)}</b></div>`
+    filePreview.hidden = false
+  })
 }
 
 async function uploadFile(file) {
@@ -978,7 +1407,7 @@ async function addMediaStory() {
   if (!file) return
   const uploaded = await uploadFile(file)
   if (!uploaded) return
-  await supabase.from('stories').insert([{ uid: user.id, image: uploaded.url, text: '', expires_at: new Date(Date.now() + 86400000).toISOString() }])
+  await supabase.from('stories').insert([{ uid: user.id, image: uploaded.url, text: '', privacy: statusPrivacySelect.value, expires_at: new Date(Date.now() + 86400000).toISOString() }])
   storyInput.value = ''
   loadStories()
 }
@@ -986,7 +1415,7 @@ async function addMediaStory() {
 async function addTextStory() {
   const text = prompt('Enter text status')
   if (!text) return
-  await supabase.from('stories').insert([{ uid: user.id, text, image: '', bg: '#00a884', expires_at: new Date(Date.now() + 86400000).toISOString() }])
+  await supabase.from('stories').insert([{ uid: user.id, text, image: '', bg: '#00a884', privacy: statusPrivacySelect.value, expires_at: new Date(Date.now() + 86400000).toISOString() }])
   loadStories()
 }
 
@@ -994,6 +1423,7 @@ async function loadStories() {
   const { data } = await supabase.from('stories').select('*').gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false })
   storiesList.innerHTML = ''
   ;(data || []).forEach(s => {
+    if (s.privacy === 'nobody' && s.uid !== user.id) return
     const hasMedia = hasUrl(s.image)
     if (!hasMedia && !s.text) return
     const div = document.createElement('div')
@@ -1005,6 +1435,7 @@ async function loadStories() {
 }
 
 function openStory(s) {
+  currentStory = s
   storyImage.style.display = 'none'
   storyVideo.style.display = 'none'
   storyTextBox.style.display = 'none'
@@ -1021,7 +1452,51 @@ function openStory(s) {
     storyTextBox.style.background = s.bg || '#00a884'
     storyTextBox.style.display = 'block'
   }
+  renderStoryActions(s)
   storyViewer.style.display = 'grid'
+}
+
+async function renderStoryActions(s) {
+  storyActions.innerHTML = ''
+  if (s.uid !== user.id) {
+    await supabase.from('status_views').upsert([{ story_id: s.id, viewer_id: user.id }], { onConflict: 'story_id,viewer_id' })
+    ;['❤️', '😂', '👍', '🔥'].forEach(emoji => {
+      const btn = document.createElement('button')
+      btn.innerText = emoji
+      btn.onclick = () => reactToStory(s.id, emoji)
+      storyActions.appendChild(btn)
+    })
+    return
+  }
+  const viewsBtn = document.createElement('button')
+  viewsBtn.innerHTML = '<i class="fa fa-eye"></i> Views'
+  viewsBtn.onclick = () => showStoryViews(s.id)
+  const delBtn = document.createElement('button')
+  delBtn.innerHTML = '<i class="fa fa-trash"></i> Delete'
+  delBtn.onclick = () => deleteStory(s.id)
+  storyActions.append(viewsBtn, delBtn)
+}
+
+async function reactToStory(storyId, emoji) {
+  await supabase.from('status_reactions').insert([{ story_id: storyId, uid: user.id, emoji }])
+  alert('Reaction sent')
+}
+
+async function showStoryViews(storyId) {
+  const [views, reactions] = await Promise.all([
+    supabase.from('status_views').select('viewer_id, created_at').eq('story_id', storyId),
+    supabase.from('status_reactions').select('uid, emoji, created_at').eq('story_id', storyId)
+  ])
+  const viewLines = (views.data || []).map(v => `Viewed by ${v.viewer_id}`).join('\n') || 'No views yet'
+  const reactionLines = (reactions.data || []).map(r => `${r.emoji} ${r.uid}`).join('\n') || 'No reactions yet'
+  alert(`${viewLines}\n\nReactions:\n${reactionLines}`)
+}
+
+async function deleteStory(storyId) {
+  if (!confirm('Delete this status?')) return
+  await supabase.from('stories').delete().eq('id', storyId).eq('uid', user.id)
+  closeStoryViewer()
+  loadStories()
 }
 
 window.closeStoryViewer = () => {
@@ -1029,6 +1504,7 @@ window.closeStoryViewer = () => {
   storyImage.src = ''
   storyVideo.src = ''
   storyTextBox.innerText = ''
+  currentStory = null
 }
 
 function toggleMessageSearch() {
@@ -1083,6 +1559,8 @@ async function startCall(type) {
   const { data, error } = await supabase.from('calls').insert([{ caller_id: user.id, receiver_id: currentChatUser.uid, type, status: 'ringing', offer }]).select().single()
   if (error) return alert(error.message)
   activeCall = data
+  await saveCallHistory(data, 'outgoing')
+  callStatusText.innerText = 'Ringing...'
   callModal.style.display = 'grid'
 }
 
@@ -1092,6 +1570,15 @@ async function setupPeer(type) {
   localVideo.srcObject = localStream
   localStream.getTracks().forEach(track => peer.addTrack(track, localStream))
   peer.ontrack = event => remoteVideo.srcObject = event.streams[0]
+  peer.onconnectionstatechange = () => {
+    if (!peer) return
+    if (['checking', 'disconnected'].includes(peer.connectionState)) callStatusText.innerText = 'Reconnecting...'
+    if (peer.connectionState === 'connected') callStatusText.innerText = 'Connected'
+    if (['failed', 'closed'].includes(peer.connectionState)) {
+      callStatusText.innerText = 'Connection failed'
+      setTimeout(closeCallUI, 1200)
+    }
+  }
   peer.onicecandidate = async event => {
     if (!event.candidate || !activeCall?.id) return
     const { data } = await supabase.from('calls').select('ice').eq('id', activeCall.id).maybeSingle()
@@ -1106,34 +1593,55 @@ async function handleIncomingCall(call) {
   incomingCallTitle.innerText = call.type === 'video' ? 'Incoming Video Call' : 'Incoming Voice Call'
   incomingCallText.innerText = 'Incoming call...'
   incomingCallModal.style.display = 'grid'
+  startRinging()
+  await saveCallHistory(call, 'incoming')
+  clearTimeout(missedCallTimer)
+  missedCallTimer = setTimeout(async () => {
+    if (activeCall?.id === call.id && call.status === 'ringing') {
+      await supabase.from('calls').update({ status: 'missed' }).eq('id', call.id)
+      await saveCallHistory(call, 'missed')
+      closeCallUI()
+    }
+  }, 30000)
 }
 
 async function acceptCall() {
   if (!activeCall) return
   incomingCallModal.style.display = 'none'
   callModal.style.display = 'grid'
+  stopRinging()
+  clearTimeout(missedCallTimer)
   await setupPeer(activeCall.type)
   await peer.setRemoteDescription(new RTCSessionDescription(activeCall.offer))
   const answer = await peer.createAnswer()
   await peer.setLocalDescription(answer)
   await supabase.from('calls').update({ status: 'accepted', answer }).eq('id', activeCall.id)
+  await saveCallHistory(activeCall, 'accepted')
 }
 
 async function rejectCall() {
   if (!activeCall) return
   await supabase.from('calls').update({ status: 'rejected' }).eq('id', activeCall.id)
+  await saveCallHistory(activeCall, 'rejected')
   incomingCallModal.style.display = 'none'
+  stopRinging()
+  clearTimeout(missedCallTimer)
   activeCall = null
 }
 
 async function endCall() {
-  if (activeCall?.id) await supabase.from('calls').update({ status: 'ended' }).eq('id', activeCall.id)
+  if (activeCall?.id) {
+    await supabase.from('calls').update({ status: 'ended' }).eq('id', activeCall.id)
+    await saveCallHistory(activeCall, 'ended')
+  }
   closeCallUI()
 }
 
 function closeCallUI() {
   callModal.style.display = 'none'
   incomingCallModal.style.display = 'none'
+  stopRinging()
+  clearTimeout(missedCallTimer)
   if (peer) peer.close()
   peer = null
   if (localStream) localStream.getTracks().forEach(track => track.stop())
@@ -1143,6 +1651,40 @@ function closeCallUI() {
   activeCall = null
   isMuted = false
   cameraOff = false
+}
+
+async function saveCallHistory(call, status) {
+  if (!call) return
+  await supabase.from('call_history').insert([{
+    caller_id: call.caller_id,
+    receiver_id: call.receiver_id,
+    call_id: call.id || null,
+    type: call.type,
+    status,
+    ended_at: ['missed', 'rejected', 'ended'].includes(status) ? new Date().toISOString() : null
+  }])
+}
+
+function startRinging() {
+  try {
+    const ctx = new AudioContext()
+    const oscillator = ctx.createOscillator()
+    const gain = ctx.createGain()
+    oscillator.frequency.value = 880
+    gain.gain.value = 0.03
+    oscillator.connect(gain)
+    gain.connect(ctx.destination)
+    oscillator.start()
+    ringingOscillator = { oscillator, ctx }
+  } catch {}
+}
+
+function stopRinging() {
+  try {
+    ringingOscillator?.oscillator.stop()
+    ringingOscillator?.ctx.close()
+  } catch {}
+  ringingOscillator = null
 }
 
 function toggleMuteInCall() {
@@ -1172,7 +1714,7 @@ async function handleCallUpdate(call) {
 
 function setupRealtime() {
   supabase
-    .channel('ichat-v6')
+    .channel('ichat-v7')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'private_chats' }, payload => {
       if (payload.eventType === 'INSERT' && payload.new.receiver_id === user.id && !mutedChats.has(`dm:${payload.new.sender_id}`)) showNotification('New message', payload.new.text || previewMessage(payload.new))
       if (mode === 'dm') loadMessages()
@@ -1192,6 +1734,13 @@ function setupRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'blocked_users' }, loadPrivacyState)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'muted_chats' }, loadPrivacyState)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'pinned_chats' }, loadPrivacyState)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, () => {})
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'starred_messages' }, loadPrivacyState)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'archived_chats' }, loadPrivacyState)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'status_views' }, () => {})
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'status_reactions' }, () => {})
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'call_history' }, () => {})
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'group_invites' }, () => {})
     .subscribe(status => console.log('Realtime:', status))
 }
 

@@ -47,3 +47,15 @@ window.loginEmail = async () => {
 
   location.href = 'chat.html'
 }
+
+window.resetPassword = async () => {
+  const email = document.getElementById('resetEmail').value.trim()
+  if (!email) return alert('Enter your email')
+
+  const redirectTo = location.origin + location.pathname.replace(/reset\.html$/, 'login.html')
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+  if (error) return alert(error.message)
+
+  alert('Password reset link sent. Check your email.')
+  location.href = 'login.html'
+}
