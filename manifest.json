@@ -1,0 +1,9 @@
+{
+  "name": "iChat V3",
+  "short_name": "iChat",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#06b6d4",
+  "icons": []
+}

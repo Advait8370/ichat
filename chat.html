@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>iChat V3</title>
+  <link rel="stylesheet" href="css/chat.css">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="app">
+
+  <aside class="sidebar">
+
+    <div class="profile">
+      <img id="profilePic" src="assets/default.png">
+      <div>
+        <h2>iChat</h2>
+        <small id="myUsername">Loading...</small>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button id="dmTab" class="active">Chats</button>
+      <button id="groupTab">Groups</button>
+    </div>
+
+    <div class="search-box">
+      <input id="searchInput" placeholder="Search username">
+    </div>
+
+    <div id="searchResults"></div>
+
+    <div class="group-tools">
+      <input id="groupNameInput" placeholder="New group name">
+      <button id="createGroupBtn">Create Group</button>
+    </div>
+
+    <div id="groupList"></div>
+
+    <button id="logoutBtn" class="logout">Logout</button>
+
+  </aside>
+
+  <main class="chat-area">
+
+    <header class="chat-header">
+      <div>
+        <h3 id="chatName">Select User or Group</h3>
+        <small id="typingText"></small>
+      </div>
+
+      <div class="header-actions">
+        <button id="voiceBtn">
+          <i class="fa fa-microphone"></i>
+        </button>
+      </div>
+    </header>
+
+    <section class="stories">
+      <label class="story-add">
+        +
+        <input id="storyInput" type="file" hidden>
+      </label>
+
+      <div id="storiesList"></div>
+    </section>
+
+    <section id="messages" class="messages">
+      <div class="empty-chat">
+        Search user or open group to start chatting.
+      </div>
+    </section>
+
+    <footer class="message-input">
+      <input id="messageInput" placeholder="Message">
+
+      <label>
+        <i class="fa fa-image"></i>
+        <input id="fileInput" type="file" hidden>
+      </label>
+
+      <button id="sendBtn">
+        <i class="fa fa-paper-plane"></i>
+      </button>
+    </footer>
+
+  </main>
+
+</div>
+
+<div id="storyViewer" class="story-viewer">
+  <button id="closeStory">×</button>
+  <img id="storyImage">
+</div>
+
+<script type="module" src="js/chat.js"></script>
+
+</body>
+</html>
