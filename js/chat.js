@@ -7,8 +7,11 @@ const input = $('messageInput')
 const sendBtn = $('sendBtn')
 const fileInput = $('fileInput')
 const searchInput = $('searchInput')
+const searchBox = document.querySelector('.search-box')
 const searchResults = $('searchResults')
 const recentChats = $('recentChats')
+const chatsTab = $('chatsTab')
+const groupsTab = $('groupsTab')
 const logoutBtn = $('logoutBtn')
 const chatName = $('chatName')
 const profilePic = $('profilePic')
@@ -17,6 +20,7 @@ const groupNameInput = $('groupNameInput')
 const createGroupBtn = $('createGroupBtn')
 const groupInviteInput = $('groupInviteInput')
 const addUserToGroupBtn = $('addUserToGroupBtn')
+const groupTools = document.querySelector('.group-tools')
 const groupList = $('groupList')
 const storyInput = $('storyInput')
 const storiesList = $('storiesList')
@@ -57,6 +61,7 @@ const deleteAccountBtn = $('deleteAccountBtn')
 let currentChatUser = null
 let currentGroup = null
 let mode = 'dm'
+let sidebarView = 'chats'
 let myProfile = null
 let recentChatsLoadId = 0
 let mediaRecorder = null
@@ -111,6 +116,7 @@ loadRecentChats()
 loadGroups()
 loadStories()
 requestNotificationPermission()
+showSidebarView('chats')
 
 async function loadMyProfile() {
   const { data } = await supabase
@@ -224,6 +230,32 @@ deleteAccountBtn.onclick = async () => {
   await supabase.from('users').delete().eq('uid', user.id)
   await supabase.auth.signOut()
   location.href = 'register.html'
+}
+
+chatsTab.onclick = () => showSidebarView('chats')
+groupsTab.onclick = () => showSidebarView('groups')
+
+function showSidebarView(view) {
+  sidebarView = view
+
+  chatsTab.classList.toggle('active', view === 'chats')
+  groupsTab.classList.toggle('active', view === 'groups')
+
+  const isChats = view === 'chats'
+  searchBox.hidden = !isChats
+  groupTools.hidden = isChats
+  groupList.hidden = isChats
+
+  if (isChats) {
+    const searching = !!searchInput.value.trim()
+    recentChats.style.display = searching ? 'none' : 'block'
+    searchResults.style.display = searching ? 'block' : 'none'
+    return
+  }
+
+  searchResults.style.display = 'none'
+  recentChats.style.display = 'none'
+  loadGroups()
 }
 
 async function loadRecentChats() {
@@ -353,6 +385,7 @@ searchInput.addEventListener('input', async () => {
 })
 
 function openDM(u) {
+  showSidebarView('chats')
   mode = 'dm'
   currentChatUser = u
   currentGroup = null
@@ -406,6 +439,7 @@ async function loadGroups() {
 }
 
 function openGroup(g) {
+  showSidebarView('groups')
   mode = 'group'
   currentGroup = g
   currentChatUser = null
