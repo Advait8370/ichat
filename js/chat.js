@@ -215,21 +215,25 @@ async function loadRecentChats() {
     ...(received.data || [])
   ]
 
-  const map = {}
+  const chatMap = new Map()
 
-  all.forEach(m => {
-    const otherId = m.sender_id === user.id ? m.receiver_id : m.sender_id
+  all.forEach(msg => {
+    const otherId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id
+    if (!otherId || otherId === user.id) return
 
-    if (!map[otherId] || new Date(m.created_at) > new Date(map[otherId].created_at)) {
-      map[otherId] = m
+    const old = chatMap.get(otherId)
+
+    if (!old || new Date(msg.created_at) > new Date(old.created_at)) {
+      chatMap.set(otherId, msg)
     }
   })
 
+  const sortedChats = [...chatMap.entries()]
+    .sort((a, b) => new Date(b[1].created_at) - new Date(a[1].created_at))
+
   recentChats.innerHTML = ''
 
-  for (const otherId of Object.keys(map)) {
-    const msg = map[otherId]
-
+  for (const [otherId, msg] of sortedChats) {
     const { data: other } = await supabase
       .from('users')
       .select('*')
@@ -238,7 +242,7 @@ async function loadRecentChats() {
 
     if (!other) continue
 
-    const unread = await supabase
+    const { data: unread } = await supabase
       .from('private_chats')
       .select('id')
       .eq('sender_id', otherId)
@@ -252,9 +256,9 @@ async function loadRecentChats() {
       <img src="${other.avatar || 'assets/logo.png'}">
       <div class="chat-meta">
         <b>@${escapeHtml(other.username)}</b>
-        <small>${previewMessage(msg)}</small>
+        <small>${escapeHtml(previewMessage(msg))}</small>
       </div>
-      ${unread.data && unread.data.length ? `<span class="unread">${unread.data.length}</span>` : ''}
+      ${unread && unread.length ? `<span class="unread">${unread.length}</span>` : ''}
     `
 
     div.onclick = () => openDM(other)
