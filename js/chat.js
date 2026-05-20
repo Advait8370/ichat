@@ -8,6 +8,7 @@ const sendBtn = $('sendBtn')
 const fileInput = $('fileInput')
 const searchInput = $('searchInput')
 const searchResults = $('searchResults')
+const recentChats = $('recentChats')
 const logoutBtn = $('logoutBtn')
 const chatName = $('chatName')
 const profilePic = $('profilePic')
@@ -25,6 +26,23 @@ const storyTextBox = $('storyTextBox')
 const textStoryBtn = $('textStoryBtn')
 const voiceBtn = $('voiceBtn')
 const typingText = $('typingText')
+const replyPreview = $('replyPreview')
+const replyText = $('replyText')
+const cancelReplyBtn = $('cancelReplyBtn')
+
+const audioCallBtn = $('audioCallBtn')
+const videoCallBtn = $('videoCallBtn')
+const incomingCallModal = $('incomingCallModal')
+const incomingCallTitle = $('incomingCallTitle')
+const incomingCallText = $('incomingCallText')
+const acceptCallBtn = $('acceptCallBtn')
+const rejectCallBtn = $('rejectCallBtn')
+const callModal = $('callModal')
+const localVideo = $('localVideo')
+const remoteVideo = $('remoteVideo')
+const muteBtn = $('muteBtn')
+const cameraBtn = $('cameraBtn')
+const endCallBtn = $('endCallBtn')
 
 const profileModal = $('profileModal')
 const settingsModal = $('settingsModal')
@@ -38,49 +56,34 @@ const deleteAccountBtn = $('deleteAccountBtn')
 
 let currentChatUser = null
 let currentGroup = null
-let mode = 'home'
+let mode = 'dm'
 let myProfile = null
 let mediaRecorder = null
 let audioChunks = []
 let typingTimer = null
+let replyToMessage = null
+
+let peer = null
+let localStream = null
+let activeCall = null
+let isMuted = false
+let cameraOff = false
+
+const rtcConfig = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' }
+  ]
+}
 
 const { data: { user } } = await supabase.auth.getUser()
-
-if (!user) {
-  location.href = 'login.html'
-}
+if (!user) location.href = 'login.html'
 
 await loadMyProfile()
+loadRecentChats()
 loadGroups()
 loadStories()
-showHomeScreen()
-
-function showHomeScreen() {
-  mode = 'home'
-  currentChatUser = null
-  currentGroup = null
-  chatName.innerText = 'iChat'
-  typingText.innerText = 'Select a chat to start messaging'
-
-  messages.innerHTML = `
-    <div class="wa-home">
-      <div class="wa-laptop">
-        <i class="fa fa-laptop"></i>
-        <i class="fa fa-phone"></i>
-      </div>
-
-      <h1>Download iChat for Windows</h1>
-      <p>Get extra features like voice messages, stories, groups and more.</p>
-      <button>Download</button>
-
-      <div class="quick-actions">
-        <div><i class="fa fa-file"></i><span>Send document</span></div>
-        <div><i class="fa fa-user-plus"></i><span>Add contact</span></div>
-        <div><i class="fa fa-sparkles"></i><span>Ask iChat AI</span></div>
-      </div>
-    </div>
-  `
-}
+requestNotificationPermission()
 
 async function loadMyProfile() {
   const { data } = await supabase
@@ -99,13 +102,10 @@ async function loadMyProfile() {
     notifyToggle.checked = data.notifications !== false
     document.body.classList.toggle('light', data.dark_mode === false)
 
-    await supabase
-      .from('users')
-      .update({
-        online: true,
-        last_seen: new Date().toISOString()
-      })
-      .eq('uid', user.id)
+    await supabase.from('users').update({
+      online: true,
+      last_seen: new Date().toISOString()
+    }).eq('uid', user.id)
 
     return
   }
@@ -127,13 +127,10 @@ async function loadMyProfile() {
 }
 
 logoutBtn.onclick = async () => {
-  await supabase
-    .from('users')
-    .update({
-      online: false,
-      last_seen: new Date().toISOString()
-    })
-    .eq('uid', user.id)
+  await supabase.from('users').update({
+    online: false,
+    last_seen: new Date().toISOString()
+  }).eq('uid', user.id)
 
   await supabase.auth.signOut()
   location.href = 'login.html'
@@ -160,29 +157,20 @@ saveProfileBtn.onclick = async () => {
   const bio = editBio.value.trim()
   let avatar = myProfile.avatar || ''
 
-  if (!username) {
-    alert('Username required')
-    return
-  }
+  if (!username) return alert('Username required')
 
   if (editAvatarFile.files[0]) {
     const uploaded = await uploadFile(editAvatarFile.files[0], 'uploads')
     if (uploaded) avatar = uploaded
   }
 
-  const { error } = await supabase
-    .from('users')
-    .update({
-      username,
-      bio,
-      avatar
-    })
-    .eq('uid', user.id)
+  const { error } = await supabase.from('users').update({
+    username,
+    bio,
+    avatar
+  }).eq('uid', user.id)
 
-  if (error) {
-    alert(error.message)
-    return
-  }
+  if (error) return alert(error.message)
 
   await loadMyProfile()
   closeProfileModal()
@@ -192,17 +180,15 @@ darkModeToggle.onchange = async () => {
   const dark = darkModeToggle.checked
   document.body.classList.toggle('light', !dark)
 
-  await supabase
-    .from('users')
-    .update({ dark_mode: dark })
-    .eq('uid', user.id)
+  await supabase.from('users').update({
+    dark_mode: dark
+  }).eq('uid', user.id)
 }
 
 notifyToggle.onchange = async () => {
-  await supabase
-    .from('users')
-    .update({ notifications: notifyToggle.checked })
-    .eq('uid', user.id)
+  await supabase.from('users').update({
+    notifications: notifyToggle.checked
+  }).eq('uid', user.id)
 }
 
 deleteAccountBtn.onclick = async () => {
@@ -213,42 +199,107 @@ deleteAccountBtn.onclick = async () => {
   location.href = 'register.html'
 }
 
+async function loadRecentChats() {
+  const sent = await supabase
+    .from('private_chats')
+    .select('*')
+    .eq('sender_id', user.id)
+
+  const received = await supabase
+    .from('private_chats')
+    .select('*')
+    .eq('receiver_id', user.id)
+
+  const all = [
+    ...(sent.data || []),
+    ...(received.data || [])
+  ]
+
+  const map = {}
+
+  all.forEach(m => {
+    const otherId = m.sender_id === user.id ? m.receiver_id : m.sender_id
+
+    if (!map[otherId] || new Date(m.created_at) > new Date(map[otherId].created_at)) {
+      map[otherId] = m
+    }
+  })
+
+  recentChats.innerHTML = ''
+
+  for (const otherId of Object.keys(map)) {
+    const msg = map[otherId]
+
+    const { data: other } = await supabase
+      .from('users')
+      .select('*')
+      .eq('uid', otherId)
+      .maybeSingle()
+
+    if (!other) continue
+
+    const unread = await supabase
+      .from('private_chats')
+      .select('id')
+      .eq('sender_id', otherId)
+      .eq('receiver_id', user.id)
+      .eq('seen', false)
+
+    const div = document.createElement('div')
+    div.className = 'chat-item'
+
+    div.innerHTML = `
+      <img src="${other.avatar || 'assets/logo.png'}">
+      <div class="chat-meta">
+        <b>@${escapeHtml(other.username)}</b>
+        <small>${previewMessage(msg)}</small>
+      </div>
+      ${unread.data && unread.data.length ? `<span class="unread">${unread.data.length}</span>` : ''}
+    `
+
+    div.onclick = () => openDM(other)
+    recentChats.appendChild(div)
+  }
+}
+
+function previewMessage(msg) {
+  if (msg.deleted_for_everyone) return 'This message was deleted'
+  if (msg.type === 'image') return '📷 Photo'
+  if (msg.type === 'voice') return '🎤 Voice message'
+  return msg.text || ''
+}
+
 searchInput.addEventListener('input', async () => {
   const value = searchInput.value.trim()
 
   if (!value) {
     searchResults.innerHTML = ''
+    recentChats.style.display = 'block'
     return
   }
+
+  recentChats.style.display = 'none'
 
   const { data, error } = await supabase
     .from('users')
     .select('*')
     .ilike('username', `%${value}%`)
 
-  if (error) {
-    console.log(error)
-    return
-  }
+  if (error) return console.log(error)
 
   searchResults.innerHTML = ''
 
-  ;(data || []).forEach(u => {
+  data.forEach(u => {
     if (u.uid === user.id) return
 
     const div = document.createElement('div')
     div.className = 'user-result'
 
     div.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;width:100%">
-        <img src="${u.avatar || 'assets/logo.png'}" style="width:49px;height:49px;border-radius:50%;object-fit:cover">
-        <div style="flex:1;min-width:0">
-          <div style="display:flex;justify-content:space-between;gap:10px">
-            <b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">@${escapeHtml(u.username)}</b>
-            <small style="color:#00a884">${u.online ? 'online' : ''}</small>
-          </div>
-          <small style="color:#8696a0">${u.online ? 'Tap to chat' : lastSeenText(u.last_seen)}</small>
-        </div>
+      <img src="${u.avatar || 'assets/logo.png'}" style="width:48px;height:48px;border-radius:50%;object-fit:cover">
+      <div>
+        <b>@${escapeHtml(u.username)}</b><br>
+        <small>${u.online ? 'online' : lastSeenText(u.last_seen)}</small>
       </div>
     `
 
@@ -268,7 +319,6 @@ function openDM(u) {
 
 createGroupBtn.onclick = async () => {
   const name = groupNameInput.value.trim()
-
   if (!name) return
 
   const { data, error } = await supabase
@@ -277,10 +327,7 @@ createGroupBtn.onclick = async () => {
     .select()
     .single()
 
-  if (error) {
-    alert(error.message)
-    return
-  }
+  if (error) return alert(error.message)
 
   await supabase.from('group_members').insert([{
     group_id: data.id,
@@ -298,10 +345,7 @@ async function loadGroups() {
     .select('group_id, groups(*)')
     .eq('uid', user.id)
 
-  if (error) {
-    console.log(error)
-    return
-  }
+  if (error) return console.log(error)
 
   groupList.innerHTML = ''
 
@@ -311,19 +355,7 @@ async function loadGroups() {
 
     const div = document.createElement('div')
     div.className = 'group-item'
-
-    div.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;width:100%">
-        <div style="width:49px;height:49px;border-radius:50%;background:#0a332c;color:#00a884;display:grid;place-items:center;font-size:22px">
-          <i class="fa fa-users"></i>
-        </div>
-        <div style="flex:1">
-          <b>${escapeHtml(g.name)}</b><br>
-          <small style="color:#8696a0">Group chat</small>
-        </div>
-      </div>
-    `
-
+    div.innerHTML = '👥 ' + escapeHtml(g.name)
     div.onclick = () => openGroup(g)
     groupList.appendChild(div)
   })
@@ -339,17 +371,10 @@ function openGroup(g) {
 }
 
 addUserToGroupBtn.onclick = async () => {
-  if (!currentGroup) {
-    alert('Open/select a group first')
-    return
-  }
+  if (!currentGroup) return alert('Open/select a group first')
 
   const username = groupInviteInput.value.trim().toLowerCase()
-
-  if (!username) {
-    alert('Enter username')
-    return
-  }
+  if (!username) return alert('Enter username')
 
   const { data: target, error } = await supabase
     .from('users')
@@ -357,15 +382,8 @@ addUserToGroupBtn.onclick = async () => {
     .eq('username', username)
     .maybeSingle()
 
-  if (error) {
-    alert(error.message)
-    return
-  }
-
-  if (!target) {
-    alert('User not found')
-    return
-  }
+  if (error) return alert(error.message)
+  if (!target) return alert('User not found')
 
   const exists = await supabase
     .from('group_members')
@@ -374,10 +392,7 @@ addUserToGroupBtn.onclick = async () => {
     .eq('uid', target.uid)
     .maybeSingle()
 
-  if (exists.data) {
-    alert('User already in group')
-    return
-  }
+  if (exists.data) return alert('User already in group')
 
   const insert = await supabase.from('group_members').insert([{
     group_id: currentGroup.id,
@@ -385,10 +400,7 @@ addUserToGroupBtn.onclick = async () => {
     role: 'member'
   }])
 
-  if (insert.error) {
-    alert(insert.error.message)
-    return
-  }
+  if (insert.error) return alert(insert.error.message)
 
   groupInviteInput.value = ''
   alert('User added to group')
@@ -409,6 +421,12 @@ input.addEventListener('input', async () => {
   typingTimer = setTimeout(() => setTyping(false), 1200)
 })
 
+cancelReplyBtn.onclick = () => {
+  replyToMessage = null
+  replyPreview.style.display = 'none'
+  replyText.innerText = ''
+}
+
 async function setTyping(isTyping) {
   if (!currentChatUser) return
 
@@ -424,18 +442,22 @@ async function setTyping(isTyping) {
 
 async function sendMessage() {
   const text = input.value.trim()
-
   if (!text) return
 
   input.value = ''
   await setTyping(false)
+
+  const replyId = replyToMessage ? replyToMessage.id : null
+  replyToMessage = null
+  replyPreview.style.display = 'none'
 
   if (mode === 'dm' && currentChatUser) {
     const { error } = await supabase.from('private_chats').insert([{
       sender_id: user.id,
       receiver_id: currentChatUser.uid,
       text,
-      type: 'text'
+      type: 'text',
+      reply_to: replyId
     }])
 
     if (error) alert(error.message)
@@ -446,13 +468,15 @@ async function sendMessage() {
       group_id: currentGroup.id,
       sender_id: user.id,
       text,
-      type: 'text'
+      type: 'text',
+      reply_to: replyId
     }])
 
     if (error) alert(error.message)
   }
 
   loadMessages()
+  loadRecentChats()
 }
 
 async function loadMessages() {
@@ -463,28 +487,16 @@ async function loadMessages() {
     const first = await supabase
       .from('private_chats')
       .select('*')
-      .match({
-        sender_id: user.id,
-        receiver_id: currentChatUser.uid
-      })
+      .match({ sender_id: user.id, receiver_id: currentChatUser.uid })
 
     const second = await supabase
       .from('private_chats')
       .select('*')
-      .match({
-        sender_id: currentChatUser.uid,
-        receiver_id: user.id
-      })
+      .match({ sender_id: currentChatUser.uid, receiver_id: user.id })
 
-    if (first.error || second.error) {
-      console.log(first.error || second.error)
-      return
-    }
+    if (first.error || second.error) return console.log(first.error || second.error)
 
-    all = [
-      ...(first.data || []),
-      ...(second.data || [])
-    ]
+    all = [...(first.data || []), ...(second.data || [])]
 
     await supabase
       .from('private_chats')
@@ -499,16 +511,13 @@ async function loadMessages() {
       .select('*')
       .eq('group_id', currentGroup.id)
 
-    if (res.error) {
-      console.log(res.error)
-      return
-    }
+    if (res.error) return console.log(res.error)
 
     all = res.data || []
   }
 
   else {
-    showHomeScreen()
+    messages.innerHTML = '<div class="empty-chat">Search user or open group to start chatting.</div>'
     return
   }
 
@@ -522,13 +531,13 @@ async function loadMessages() {
   for (const msg of all) {
     const deleted = await isDeletedForMe(msg.id)
     if (deleted) continue
-    await renderMessage(msg)
+    await renderMessage(msg, all)
   }
 
   messages.scrollTop = messages.scrollHeight
 }
 
-async function renderMessage(msg) {
+async function renderMessage(msg, allMessages) {
   const div = document.createElement('div')
 
   div.classList.add(
@@ -537,33 +546,40 @@ async function renderMessage(msg) {
   )
 
   if (msg.deleted_for_everyone) {
-    div.innerHTML = `<i>This message was deleted</i>`
+    div.innerHTML = `<i>This message was deleted</i><span class="msg-time">${formatTime(msg.created_at)}</span>`
     messages.appendChild(div)
     return
   }
 
+  let replyHtml = ''
+  if (msg.reply_to) {
+    const original = allMessages.find(m => m.id === msg.reply_to)
+    if (original) {
+      replyHtml = `<div class="reply-box">${escapeHtml(original.text || previewMessage(original))}</div>`
+    }
+  }
+
   if (msg.type === 'image') {
     if (!msg.image || msg.image === 'null') return
-    div.innerHTML = `<img src="${msg.image}">`
+    div.innerHTML = `${replyHtml}<img src="${msg.image}">`
   }
 
   else if (msg.type === 'voice') {
     if (!msg.audio || msg.audio === 'null') return
-    div.innerHTML = `<audio controls src="${msg.audio}"></audio>`
+    div.innerHTML = `${replyHtml}<audio controls src="${msg.audio}"></audio>`
   }
 
   else {
-    div.innerHTML = `
-      ${escapeHtml(msg.text || '')}
-      ${msg.edited ? ' <small>(edited)</small>' : ''}
-    `
+    div.innerHTML = `${replyHtml}${escapeHtml(msg.text || '')}${msg.edited ? ' <small>(edited)</small>' : ''}`
   }
 
   const reactions = await getReactions(msg.id)
 
   div.innerHTML += `
     <div class="reactions">${reactions}</div>
+    <span class="msg-time">${formatTime(msg.created_at)}</span>
     <div class="msg-actions">
+      <button onclick="replyMessage(${msg.id})">Reply</button>
       ${msg.sender_id === user.id && msg.type === 'text' ? `<button onclick="editMessage(${msg.id})">Edit</button>` : ''}
       <button onclick="deleteForMe(${msg.id})">Delete me</button>
       ${msg.sender_id === user.id ? `<button onclick="deleteForEveryone(${msg.id})">Delete all</button>` : ''}
@@ -601,6 +617,22 @@ async function getReactions(messageId) {
   return (data || []).map(r => r.emoji).join(' ')
 }
 
+window.replyMessage = async messageId => {
+  const table = mode === 'dm' ? 'private_chats' : 'group_messages'
+
+  const { data } = await supabase
+    .from(table)
+    .select('*')
+    .eq('id', messageId)
+    .maybeSingle()
+
+  if (!data) return
+
+  replyToMessage = data
+  replyText.innerText = data.text || previewMessage(data)
+  replyPreview.style.display = 'flex'
+}
+
 window.reactMessage = async (messageId, emoji) => {
   await supabase.from('message_reactions').insert([{
     message_id: messageId,
@@ -625,44 +657,37 @@ window.deleteForMe = async messageId => {
 window.deleteForEveryone = async messageId => {
   const table = mode === 'dm' ? 'private_chats' : 'group_messages'
 
-  await supabase
-    .from(table)
-    .update({
-      deleted_for_everyone: true,
-      text: '',
-      image: '',
-      audio: ''
-    })
-    .eq('id', messageId)
+  await supabase.from(table).update({
+    deleted_for_everyone: true,
+    text: '',
+    image: '',
+    audio: ''
+  }).eq('id', messageId)
 
   loadMessages()
+  loadRecentChats()
 }
 
 window.editMessage = async messageId => {
   const newText = prompt('Edit message')
-
   if (!newText) return
 
   const table = mode === 'dm' ? 'private_chats' : 'group_messages'
 
-  await supabase
-    .from(table)
-    .update({
-      text: newText,
-      edited: true
-    })
-    .eq('id', messageId)
+  await supabase.from(table).update({
+    text: newText,
+    edited: true
+  }).eq('id', messageId)
 
   loadMessages()
+  loadRecentChats()
 }
 
 fileInput.onchange = async () => {
   const file = fileInput.files[0]
-
   if (!file) return
 
   const url = await uploadFile(file, 'uploads')
-
   if (!url) return
 
   if (mode === 'dm' && currentChatUser) {
@@ -670,7 +695,8 @@ fileInput.onchange = async () => {
       sender_id: user.id,
       receiver_id: currentChatUser.uid,
       type: 'image',
-      image: url
+      image: url,
+      reply_to: replyToMessage ? replyToMessage.id : null
     }])
   }
 
@@ -679,11 +705,16 @@ fileInput.onchange = async () => {
       group_id: currentGroup.id,
       sender_id: user.id,
       type: 'image',
-      image: url
+      image: url,
+      reply_to: replyToMessage ? replyToMessage.id : null
     }])
   }
 
+  replyToMessage = null
+  replyPreview.style.display = 'none'
+
   loadMessages()
+  loadRecentChats()
 }
 
 voiceBtn.onclick = async () => {
@@ -693,30 +724,18 @@ voiceBtn.onclick = async () => {
     return
   }
 
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: true
-  })
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
 
   mediaRecorder = new MediaRecorder(stream)
   audioChunks = []
 
-  mediaRecorder.ondataavailable = e => {
-    audioChunks.push(e.data)
-  }
+  mediaRecorder.ondataavailable = e => audioChunks.push(e.data)
 
   mediaRecorder.onstop = async () => {
-    const blob = new Blob(audioChunks, {
-      type: 'audio/webm'
-    })
-
-    const file = new File(
-      [blob],
-      'voice.webm',
-      { type: 'audio/webm' }
-    )
+    const blob = new Blob(audioChunks, { type: 'audio/webm' })
+    const file = new File([blob], 'voice.webm', { type: 'audio/webm' })
 
     const url = await uploadFile(file, 'uploads')
-
     if (!url) return
 
     if (mode === 'dm' && currentChatUser) {
@@ -724,7 +743,8 @@ voiceBtn.onclick = async () => {
         sender_id: user.id,
         receiver_id: currentChatUser.uid,
         type: 'voice',
-        audio: url
+        audio: url,
+        reply_to: replyToMessage ? replyToMessage.id : null
       }])
     }
 
@@ -733,11 +753,16 @@ voiceBtn.onclick = async () => {
         group_id: currentGroup.id,
         sender_id: user.id,
         type: 'voice',
-        audio: url
+        audio: url,
+        reply_to: replyToMessage ? replyToMessage.id : null
       }])
     }
 
+    replyToMessage = null
+    replyPreview.style.display = 'none'
+
     loadMessages()
+    loadRecentChats()
   }
 
   mediaRecorder.start()
@@ -746,11 +771,9 @@ voiceBtn.onclick = async () => {
 
 storyInput.onchange = async () => {
   const file = storyInput.files[0]
-
   if (!file) return
 
   const url = await uploadFile(file, 'uploads')
-
   if (!url) return
 
   await supabase.from('stories').insert([{
@@ -765,7 +788,6 @@ storyInput.onchange = async () => {
 
 textStoryBtn.onclick = async () => {
   const text = prompt('Enter text status')
-
   if (!text) return
 
   await supabase.from('stories').insert([{
@@ -826,18 +848,206 @@ window.closeStoryViewer = () => {
   storyTextBox.innerText = ''
 }
 
+audioCallBtn.onclick = () => startCall('audio')
+videoCallBtn.onclick = () => startCall('video')
+
+async function startCall(type) {
+  if (!currentChatUser) return alert('Select a user first. Calls work only in private chat.')
+
+  activeCall = {
+    caller_id: user.id,
+    receiver_id: currentChatUser.uid,
+    type,
+    status: 'ringing'
+  }
+
+  await setupPeer(type)
+
+  const offer = await peer.createOffer()
+  await peer.setLocalDescription(offer)
+
+  const { data, error } = await supabase.from('calls').insert([{
+    caller_id: user.id,
+    receiver_id: currentChatUser.uid,
+    type,
+    status: 'ringing',
+    offer
+  }]).select().single()
+
+  if (error) return alert(error.message)
+
+  activeCall = data
+  callModal.style.display = 'grid'
+}
+
+async function setupPeer(type) {
+  peer = new RTCPeerConnection(rtcConfig)
+
+  localStream = await navigator.mediaDevices.getUserMedia({
+    audio: true,
+    video: type === 'video'
+  })
+
+  localVideo.srcObject = localStream
+
+  localStream.getTracks().forEach(track => {
+    peer.addTrack(track, localStream)
+  })
+
+  peer.ontrack = event => {
+    remoteVideo.srcObject = event.streams[0]
+  }
+
+  peer.onicecandidate = async event => {
+    if (!event.candidate || !activeCall?.id) return
+
+    const { data } = await supabase
+      .from('calls')
+      .select('ice')
+      .eq('id', activeCall.id)
+      .maybeSingle()
+
+    const oldIce = data?.ice || []
+
+    await supabase
+      .from('calls')
+      .update({
+        ice: [...oldIce, event.candidate.toJSON()]
+      })
+      .eq('id', activeCall.id)
+  }
+}
+
+async function handleIncomingCall(call) {
+  if (call.receiver_id !== user.id || call.status !== 'ringing') return
+
+  activeCall = call
+  incomingCallTitle.innerText = call.type === 'video' ? 'Incoming Video Call' : 'Incoming Voice Call'
+  incomingCallText.innerText = 'Incoming call...'
+  incomingCallModal.style.display = 'grid'
+}
+
+acceptCallBtn.onclick = async () => {
+  if (!activeCall) return
+
+  incomingCallModal.style.display = 'none'
+  callModal.style.display = 'grid'
+
+  await setupPeer(activeCall.type)
+
+  await peer.setRemoteDescription(new RTCSessionDescription(activeCall.offer))
+
+  const answer = await peer.createAnswer()
+  await peer.setLocalDescription(answer)
+
+  await supabase.from('calls').update({
+    status: 'accepted',
+    answer
+  }).eq('id', activeCall.id)
+}
+
+rejectCallBtn.onclick = async () => {
+  if (!activeCall) return
+
+  await supabase.from('calls').update({
+    status: 'rejected'
+  }).eq('id', activeCall.id)
+
+  incomingCallModal.style.display = 'none'
+  activeCall = null
+}
+
+endCallBtn.onclick = endCall
+
+async function endCall() {
+  if (activeCall?.id) {
+    await supabase.from('calls').update({
+      status: 'ended'
+    }).eq('id', activeCall.id)
+  }
+
+  closeCallUI()
+}
+
+function closeCallUI() {
+  callModal.style.display = 'none'
+  incomingCallModal.style.display = 'none'
+
+  if (peer) {
+    peer.close()
+    peer = null
+  }
+
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop())
+    localStream = null
+  }
+
+  localVideo.srcObject = null
+  remoteVideo.srcObject = null
+  activeCall = null
+  isMuted = false
+  cameraOff = false
+}
+
+muteBtn.onclick = () => {
+  if (!localStream) return
+
+  isMuted = !isMuted
+
+  localStream.getAudioTracks().forEach(track => {
+    track.enabled = !isMuted
+  })
+
+  muteBtn.innerHTML = isMuted
+    ? '<i class="fa fa-microphone-slash"></i>'
+    : '<i class="fa fa-microphone"></i>'
+}
+
+cameraBtn.onclick = () => {
+  if (!localStream) return
+
+  cameraOff = !cameraOff
+
+  localStream.getVideoTracks().forEach(track => {
+    track.enabled = !cameraOff
+  })
+
+  cameraBtn.innerHTML = cameraOff
+    ? '<i class="fa fa-video-slash"></i>'
+    : '<i class="fa fa-video"></i>'
+}
+
+async function handleCallUpdate(call) {
+  if (!activeCall || call.id !== activeCall.id) return
+
+  if (call.status === 'accepted' && call.answer && user.id === call.caller_id) {
+    await peer.setRemoteDescription(new RTCSessionDescription(call.answer))
+  }
+
+  if (call.ice && peer) {
+    for (const c of call.ice) {
+      try {
+        await peer.addIceCandidate(new RTCIceCandidate(c))
+      } catch {}
+    }
+  }
+
+  if (['ended', 'rejected'].includes(call.status)) {
+    closeCallUI()
+  }
+}
+
 async function uploadFile(file, bucket) {
   if (!file) return null
 
   const ext = file.name.split('.').pop().toLowerCase()
   const safeName = `${user.id}/${crypto.randomUUID()}.${ext}`
 
-  const { error } = await supabase.storage
-    .from(bucket)
-    .upload(safeName, file, {
-      cacheControl: '3600',
-      upsert: false
-    })
+  const { error } = await supabase.storage.from(bucket).upload(safeName, file, {
+    cacheControl: '3600',
+    upsert: false
+  })
 
   if (error) {
     console.log(error)
@@ -845,63 +1055,39 @@ async function uploadFile(file, bucket) {
     return null
   }
 
-  const { data } = supabase.storage
-    .from(bucket)
-    .getPublicUrl(safeName)
+  const { data } = supabase.storage.from(bucket).getPublicUrl(safeName)
 
   return data.publicUrl || null
 }
 
 supabase
-  .channel('ichat-v4')
-  .on('postgres_changes', {
-    event: '*',
-    schema: 'public',
-    table: 'private_chats'
-  }, () => {
+  .channel('ichat-v5')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'private_chats' }, payload => {
+    if (payload.eventType === 'INSERT' && payload.new.receiver_id === user.id) {
+      showNotification('New message', payload.new.text || previewMessage(payload.new))
+    }
+
     if (mode === 'dm') loadMessages()
+    loadRecentChats()
   })
-  .on('postgres_changes', {
-    event: '*',
-    schema: 'public',
-    table: 'group_messages'
-  }, () => {
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'group_messages' }, () => {
     if (mode === 'group') loadMessages()
   })
-  .on('postgres_changes', {
-    event: '*',
-    schema: 'public',
-    table: 'message_reactions'
-  }, () => {
-    if (mode !== 'home') loadMessages()
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, loadMessages)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'deleted_messages' }, loadMessages)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, loadGroups)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, loadGroups)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'stories' }, loadStories)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'calls' }, payload => {
+    const call = payload.new
+
+    if (call.receiver_id === user.id && call.status === 'ringing') {
+      handleIncomingCall(call)
+    }
+
+    handleCallUpdate(call)
   })
-  .on('postgres_changes', {
-    event: '*',
-    schema: 'public',
-    table: 'deleted_messages'
-  }, () => {
-    if (mode !== 'home') loadMessages()
-  })
-  .on('postgres_changes', {
-    event: '*',
-    schema: 'public',
-    table: 'groups'
-  }, loadGroups)
-  .on('postgres_changes', {
-    event: '*',
-    schema: 'public',
-    table: 'group_members'
-  }, loadGroups)
-  .on('postgres_changes', {
-    event: '*',
-    schema: 'public',
-    table: 'stories'
-  }, loadStories)
-  .on('postgres_changes', {
-    event: '*',
-    schema: 'public',
-    table: 'typing_status'
-  }, payload => {
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'typing_status' }, payload => {
     const t = payload.new
 
     if (
@@ -917,19 +1103,31 @@ supabase
           : lastSeenText(currentChatUser.last_seen)
     }
   })
-  .subscribe(status => {
-    console.log('Realtime:', status)
-  })
+  .subscribe(status => console.log('Realtime:', status))
 
 window.addEventListener('beforeunload', async () => {
-  await supabase
-    .from('users')
-    .update({
-      online: false,
-      last_seen: new Date().toISOString()
-    })
-    .eq('uid', user.id)
+  await supabase.from('users').update({
+    online: false,
+    last_seen: new Date().toISOString()
+  }).eq('uid', user.id)
 })
+
+function requestNotificationPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission()
+  }
+}
+
+function showNotification(title, body) {
+  if (!myProfile?.notifications) return
+  if (!('Notification' in window)) return
+  if (Notification.permission !== 'granted') return
+
+  new Notification(title, {
+    body,
+    icon: 'assets/logo.png'
+  })
+}
 
 function escapeHtml(text = '') {
   const div = document.createElement('div')
@@ -947,4 +1145,11 @@ function lastSeenText(date) {
   if (diff < 86400) return `last seen ${Math.floor(diff / 3600)} hours ago`
 
   return 'last seen ' + new Date(date).toLocaleDateString()
+}
+
+function formatTime(date) {
+  return new Date(date).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }

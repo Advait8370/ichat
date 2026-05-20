@@ -3,31 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>iChat V4</title>
+  <title>iChat V5</title>
   <link rel="stylesheet" href="css/chat.css">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
 </head>
 <body>
 
 <div class="app">
-
-  <nav class="wa-rail">
-    <button class="active"><i class="fa fa-message"></i></button>
-    <button><i class="fa fa-circle-notch"></i></button>
-    <button><i class="fa fa-users"></i></button>
-    <button onclick="openSettingsModal()"><i class="fa fa-gear"></i></button>
-    <button onclick="openProfileModal()"><img src="assets/logo.png"></button>
-  </nav>
-
   <aside class="sidebar">
-
-    <div class="wa-title">
-      <h1>iChat</h1>
-      <div>
-        <button><i class="fa fa-square-plus"></i></button>
-        <button onclick="openSettingsModal()"><i class="fa fa-ellipsis-vertical"></i></button>
-      </div>
-    </div>
 
     <div class="profile" onclick="openProfileModal()">
       <img id="profilePic" src="assets/logo.png">
@@ -35,19 +18,19 @@
         <h2>iChat</h2>
         <small id="myUsername">Loading...</small>
       </div>
+      <button onclick="event.stopPropagation();openSettingsModal()">⚙</button>
+    </div>
+
+    <div class="tabs">
+      <button class="active" id="chatsTab">Chats</button>
+      <button id="groupsTab">Groups</button>
     </div>
 
     <div class="search-box">
-      <i class="fa fa-search"></i>
-      <input id="searchInput" placeholder="Search or start a new chat">
+      <input id="searchInput" placeholder="Search username">
     </div>
 
-    <div class="wa-filters">
-      <button class="active">All</button>
-      <button>Family</button>
-      <button>Friends</button>
-    </div>
-
+    <div id="recentChats" class="recent-chats"></div>
     <div id="searchResults"></div>
 
     <div class="group-tools">
@@ -66,10 +49,15 @@
 
     <header class="chat-header">
       <div>
-        <h3 id="chatName">iChat</h3>
-        <small id="typingText">Select a chat to start messaging</small>
+        <h3 id="chatName">Select User or Group</h3>
+        <small id="typingText"></small>
       </div>
-      <button id="voiceBtn"><i class="fa fa-microphone"></i></button>
+
+      <div class="call-buttons">
+        <button id="audioCallBtn" title="Voice Call"><i class="fa fa-phone"></i></button>
+        <button id="videoCallBtn" title="Video Call"><i class="fa fa-video"></i></button>
+        <button id="voiceBtn" title="Voice Message"><i class="fa fa-microphone"></i></button>
+      </div>
     </header>
 
     <section class="stories">
@@ -78,28 +66,18 @@
       <div id="storiesList"></div>
     </section>
 
+    <div id="replyPreview" class="reply-preview">
+      <span id="replyText"></span>
+      <button id="cancelReplyBtn">×</button>
+    </div>
+
     <section id="messages" class="messages">
-      <div class="wa-home">
-        <div class="wa-laptop">
-          <i class="fa fa-laptop"></i>
-          <i class="fa fa-phone"></i>
-        </div>
-
-        <h1>Download iChat for Windows</h1>
-        <p>Get extra features like voice messages, stories, groups and more.</p>
-        <button>Download</button>
-
-        <div class="quick-actions">
-          <div><i class="fa fa-file"></i><span>Send document</span></div>
-          <div><i class="fa fa-user-plus"></i><span>Add contact</span></div>
-          <div><i class="fa fa-sparkles"></i><span>Ask iChat AI</span></div>
-        </div>
-      </div>
+      <div class="empty-chat">Search user or open group to start chatting.</div>
     </section>
 
     <footer class="message-input">
-      <input id="messageInput" placeholder="Type a message">
-      <label><i class="fa fa-paperclip"></i><input id="fileInput" type="file" hidden></label>
+      <input id="messageInput" placeholder="Message">
+      <label><i class="fa fa-image"></i><input id="fileInput" type="file" hidden></label>
       <button id="sendBtn"><i class="fa fa-paper-plane"></i></button>
     </footer>
 
@@ -130,6 +108,32 @@
     <label><input id="darkModeToggle" type="checkbox" checked> Dark Mode</label>
     <label><input id="notifyToggle" type="checkbox" checked> Notifications</label>
     <button id="deleteAccountBtn" class="danger">Delete Account</button>
+  </div>
+</div>
+
+<div id="incomingCallModal" class="modal">
+  <div class="modal-box call-box">
+    <h2 id="incomingCallTitle">Incoming Call</h2>
+    <p id="incomingCallText">Someone is calling...</p>
+    <div class="call-actions">
+      <button id="acceptCallBtn">Accept</button>
+      <button id="rejectCallBtn" class="danger">Reject</button>
+    </div>
+  </div>
+</div>
+
+<div id="callModal" class="modal">
+  <div class="call-screen">
+    <div class="video-wrap">
+      <video id="remoteVideo" autoplay playsinline></video>
+      <video id="localVideo" autoplay muted playsinline></video>
+    </div>
+
+    <div class="call-controls">
+      <button id="muteBtn"><i class="fa fa-microphone"></i></button>
+      <button id="cameraBtn"><i class="fa fa-video"></i></button>
+      <button id="endCallBtn" class="danger"><i class="fa fa-phone-slash"></i></button>
+    </div>
   </div>
 </div>
 
